@@ -6,10 +6,1003 @@
 <title>Pokémon OST Blindtest — 30 ans</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 
+<!-- Proxy global : bufferise les appels HTML inline avant que le module ES soit prêt -->
+<script>
+(function(){
+  const FNS = ['gbSelectGender','gbJoin','gbStart','gbReveal','gbSkip','gbNext',
+               'gbReset','gbToggleOst','kickPlayer','gbDpad','gbBtnA','gbBtnB'];
+  FNS.forEach(fn=>{
+    window[fn] = function(){
+      // Si la vraie fonction est déjà là, l'appeler
+      if(window['_real_'+fn]) return window['_real_'+fn].apply(this, arguments);
+      // Sinon bufferiser
+      (window['_queue_'+fn] = window['_queue_'+fn]||[]).push(arguments);
+    };
+  });
+  // Appelé par le module ES une fois prêt
+  window._registerFn = function(name, fn){
+    window['_real_'+name] = fn;
+    const q = window['_queue_'+name]||[];
+    q.forEach(args=>fn.apply(null, args));
+    delete window['_queue_'+name];
+    window[name] = fn; // remplace le proxy
+  };
+})();
+</script>
+
 <!-- ═══════════════════════════════════════════
   🔥 FIREBASE CONFIG — À REMPLACER PAR LA TIENNE
   (console.firebase.google.com → ton projet → </> → firebaseConfig)
 ═══════════════════════════════════════════ -->
+
+
+<style>
+:root{
+  --gb0:#0f1a0f;--gb1:#1a3320;--gb2:#2d5a27;--gb3:#5a8c3a;
+  --gb4:#8bbc0f;--gb5:#b8d860;--gb6:#d4e8a0;--gb7:#e8f0c8;
+  --red:#cc2200;--gold:#e8c020;--screen-w:min(96vw, 85vh);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:#0a0f0a;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;
+  padding:10px 10px 20px;
+  font-family:'Press Start 2P',monospace;
+  overflow-x:hidden;
+}
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent 0px,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);
+  pointer-events:none;z-index:9999;
+}
+/* GAMEBOY SHELL — POKÉGRAPH SKIN */
+.gb-shell{
+  width:min(var(--screen-w),96vw);
+  background:linear-gradient(160deg, #1a4a9e 0%, #1235a0 40%, #0d2878 70%, #091d60 100%);
+  border-radius:10px 10px 40px 40px;
+  padding:16px 16px 20px;
+  box-shadow:
+    inset 0 3px 8px rgba(255,255,255,.25),
+    inset 0 -6px 14px rgba(0,0,0,.4),
+    0 16px 60px rgba(0,0,0,.85),
+    0 0 0 3px #0a1d5a,
+    0 0 0 5px rgba(255,255,255,.06);
+  position:relative;
+}
+.gb-shell::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:48%;
+  background:linear-gradient(160deg,rgba(255,255,255,.22) 0%,transparent 60%);
+  border-radius:10px 10px 0 0;pointer-events:none;
+}
+/* Bande dorée décorative en bas */
+.gb-shell::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:6px;
+  background:linear-gradient(90deg,transparent 5%,#e8c020 20%,#f8e060 50%,#e8c020 80%,transparent 95%);
+  border-radius:0 0 40px 40px;opacity:.75;
+}
+.bezel{
+  background:linear-gradient(145deg,#080c18,#050810);
+  border-radius:10px 10px 18px 18px;
+  padding:16px 16px 28px;margin-bottom:16px;
+  box-shadow:inset 0 6px 18px rgba(0,0,0,.95),0 2px 6px rgba(30,80,200,.3);
+  position:relative;
+}
+.bezel-label{position:absolute;top:7px;left:50%;transform:translateX(-50%);font-size:7px;color:#2244aa;letter-spacing:5px;white-space:nowrap;}
+.power-led{
+  position:absolute;top:10px;right:18px;width:10px;height:10px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#66aaff,#1144cc);
+  box-shadow:0 0 10px #4488ff,0 0 20px rgba(68,136,255,.4);
+  animation:led 2.5s ease-in-out infinite;
+}
+@keyframes led{0%,100%{opacity:1}50%{opacity:.25}}
+.screen{width:100%;aspect-ratio:10/9;background:var(--gb4);border:4px solid #060a14;border-radius:4px;position:relative;overflow:hidden;image-rendering:pixelated;box-shadow:inset 0 0 40px rgba(0,0,0,.5),0 0 0 2px rgba(30,80,200,.3);}
+/* Zone logo Pokégraph */
+.pokegraph-brand{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0 4px;}
+.pg-tagline{font-family:'Press Start 2P',monospace;font-size:5px;color:rgba(255,255,255,.3);letter-spacing:2px;text-align:center;}
+/* D-pad cliquable avec flèches */
+.dpad{position:relative;width:76px;height:76px;flex-shrink:0;}
+.dp-up,.dp-down,.dp-left,.dp-right,.dp-c{
+  position:absolute;
+  background:linear-gradient(135deg,#ddeeff,#99bbee);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.4),0 2px 0 rgba(0,0,40,.6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:#112255;cursor:pointer;
+  user-select:none;-webkit-user-select:none;
+  transition:all .08s;
+}
+.dp-up   {width:33%;height:33%;top:0;   left:33%;border-radius:3px 3px 0 0;}
+.dp-down {width:33%;height:33%;bottom:0;left:33%;border-radius:0 0 3px 3px;}
+.dp-left {width:33%;height:33%;top:33%;left:0;   border-radius:3px 0 0 3px;}
+.dp-right{width:33%;height:33%;top:33%;right:0;  border-radius:0 3px 3px 0;}
+.dp-c    {width:33%;height:33%;top:33%;left:33%;background:#aaccee;pointer-events:none;}
+.dp-up:active,.dp-down:active,.dp-left:active,.dp-right:active{
+  background:linear-gradient(135deg,#bbddff,#6699cc);
+  transform:scale(.92);
+  box-shadow:inset 0 3px 5px rgba(0,0,0,.5),0 1px 0 rgba(0,0,40,.6);
+}
+/* Curseur pad sur les réponses */
+.ans-opt.pad-cursor{
+  border-color:var(--gb6) !important;
+  background:var(--gb1) !important;
+  box-shadow:0 0 0 2px var(--gb5), inset 0 0 8px rgba(139,188,15,.2);
+}
+.ans-opt.pad-cursor::after{
+  content:'◀';
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  font-size:8px;color:var(--gb5);
+  animation:cursorBlink .6s steps(1) infinite;
+}
+/* Boutons SELECT/START */
+.ss-btn{background:linear-gradient(to bottom,#aabbdd,#7799cc);border:none;border-radius:20px;width:52px;height:13px;box-shadow:0 3px 5px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.3);cursor:pointer;font-family:'Press Start 2P',monospace;font-size:6px;color:#112255;transition:transform .1s;}
+.ss-btn:active{transform:translateY(1px);}
+/* Marque Pokégraph */
+.gb-brand{font-size:9px;background:linear-gradient(to right,#88bbff,#ffffff,#88bbff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:1px;margin-top:3px;}
+/* Boutons A/B dorés */
+.btn-b,.btn-a{border:none;border-radius:50%;font-family:'Press Start 2P',monospace;font-size:10px;color:#0a1a5a;cursor:pointer;box-shadow:inset 0 2px 3px rgba(255,255,255,.4),0 5px 0 rgba(0,0,0,.5);transition:all .1s;display:flex;align-items:center;justify-content:center;}
+.btn-b{width:42px;height:42px;margin-top:10px;background:radial-gradient(circle at 35% 35%,#f0d040,#c89000);}
+.btn-a{width:50px;height:50px;background:radial-gradient(circle at 35% 35%,#f8e060,#d4a000);}
+.btn-b:active,.btn-a:active{box-shadow:inset 0 2px 3px rgba(0,0,0,.3),0 2px 0 rgba(0,0,0,.4);transform:translateY(3px);}
+.screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(139,188,15,.15) 0%,transparent 70%);pointer-events:none;z-index:200;}
+.screen::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 4px),repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,.03) 3px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:201;}
+/* PAGES */
+.page{display:none;position:absolute;inset:0;flex-direction:column;align-items:center;}
+.page.active{display:flex;}
+/* CONNECT — hero animated screen */
+#pg-connect{background:var(--gb0);justify-content:flex-start;align-items:center;padding:12px 14px;gap:8px;overflow:hidden;}
+
+/* Floating Pokéballs */
+.pokeball-deco{position:absolute;border-radius:50%;opacity:.18;animation:pbFloat linear infinite;}
+.pb1{width:60px;height:60px;top:-10px;left:10%;animation-duration:8s;animation-delay:0s;}
+.pb2{width:40px;height:40px;bottom:20%;right:5%;animation-duration:10s;animation-delay:-3s;}
+.pb3{width:80px;height:80px;bottom:-20px;left:55%;animation-duration:12s;animation-delay:-6s;}
+@keyframes pbFloat{
+  0%  {transform:translateY(0) rotate(0deg);}
+  25% {transform:translateY(-20px) rotate(90deg);}
+  50% {transform:translateY(-10px) rotate(180deg);}
+  75% {transform:translateY(-25px) rotate(270deg);}
+  100%{transform:translateY(0) rotate(360deg);}
+}
+
+/* Hero title */
+.connect-hero{width:100%;text-align:center;padding:6px 0 4px;}
+.hero-badge{
+  font-size:6px;color:var(--gb4);letter-spacing:1px;
+  background:var(--gb1);border:1px solid var(--gb2);
+  display:inline-block;padding:3px 10px;border-radius:1px;
+  margin-bottom:6px;
+  animation:badgeShimmer 2s ease-in-out infinite;
+}
+@keyframes badgeShimmer{0%,100%{opacity:.8;color:var(--gb4)}50%{opacity:1;color:var(--gb6)}}
+.hero-title{
+  font-size:clamp(18px,5vw,26px);
+  color:var(--gb6);
+  text-shadow:3px 3px 0 var(--gb0), 4px 4px 0 var(--gb1);
+  letter-spacing:3px;
+  animation:titlePop .6s cubic-bezier(.34,1.56,.64,1) both;
+  line-height:1.1;
+}
+@keyframes titlePop{from{transform:scale(0.4);opacity:0}to{transform:scale(1);opacity:1}}
+.hero-sub{
+  font-size:clamp(8px,2.5vw,12px);
+  color:var(--gb5);
+  letter-spacing:2px;
+  margin-top:4px;
+  animation:titlePop .6s .15s cubic-bezier(.34,1.56,.64,1) both;
+}
+.hero-stars{
+  font-size:8px;color:var(--gold);
+  margin-top:5px;letter-spacing:4px;
+  animation:starGlow 1.5s ease-in-out infinite;
+}
+@keyframes starGlow{0%,100%{opacity:.5;text-shadow:none}50%{opacity:1;text-shadow:0 0 8px #e8c020}}
+
+/* Gender buttons bigger in new layout */
+.connect-form .gender-btn{padding:8px 18px;font-size:7px;}
+.connect-form .gender-btn svg{image-rendering:pixelated;}
+
+/* CONNECT */
+#pg-connect{background:var(--gb0);justify-content:center;align-items:center;padding:16px;gap:9px;}
+.connect-title{font-size:12px;color:var(--gb5);text-align:center;line-height:1.8;margin-bottom:6px;}
+.connect-sub{font-size:7px;color:var(--gb3);text-align:center;line-height:1.8;}
+.gender-row{width:100%;background:var(--gb1);border-radius:3px;padding:7px 12px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.gender-label{font-size:7px;color:var(--gb3);white-space:nowrap;}
+.gender-btns{display:flex;gap:8px;flex:1;justify-content:center;}
+.gender-btn{background:rgba(45,90,39,.3);border:2px solid var(--gb2);font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gb3);padding:6px 14px;cursor:pointer;border-radius:3px;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .2s;}
+.gender-btn:hover{background:var(--gb1);color:var(--gb5);border-color:var(--gb4);}
+.gender-btn.active{
+  background:var(--gb4);
+  color:var(--gb0);
+  border-color:var(--gb6);
+  box-shadow:0 0 8px var(--gb4), inset 0 0 4px rgba(255,255,255,.2);
+  transform:scale(1.06);
+}
+.connect-row{display:flex;gap:6px;width:100%;}
+.gb-input{flex:1;background:#0a100a;border:2px solid var(--gb2);color:var(--gb5);font-family:'Press Start 2P',monospace;font-size:10px;padding:9px 12px;outline:none;border-radius:3px;transition:border-color .2s;}
+.gb-input:focus{border-color:var(--gb5);}
+.gb-input::placeholder{color:var(--gb2);}
+.gb-input.pass-inp{letter-spacing:4px;text-align:center;}
+.gb-btn{background:var(--gb2);color:var(--gb5);border:2px solid var(--gb3);font-family:'Press Start 2P',monospace;font-size:10px;padding:9px 14px;cursor:pointer;border-radius:3px;white-space:nowrap;transition:all .1s;}
+.gb-btn:hover{background:var(--gb3);}
+.gb-btn:active{transform:translateY(1px);}
+.connect-hint{font-size:6px;color:rgba(45,90,39,.7);text-align:center;line-height:2;}
+@keyframes inputShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+/* LOBBY */
+#pg-lobby{background:var(--gb4);padding:10px;justify-content:flex-start;gap:6px;}
+.lobby-head{width:100%;text-align:center;font-size:clamp(10px,2vw,14px);color:var(--gb0);line-height:1.8;border-bottom:3px solid var(--gb0);padding-bottom:6px;}
+.add-row{display:flex;gap:5px;width:100%;}
+.players-scroll{width:100%;flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--gb2) var(--gb3);display:flex;flex-direction:column;gap:3px;}
+.p-row{display:flex;align-items:center;gap:6px;background:var(--gb0);color:var(--gb5);padding:6px 10px;border-radius:3px;font-size:10px;flex-shrink:0;animation:slideIn .2s ease-out;}
+@keyframes slideIn{from{transform:translateX(-10px);opacity:0}to{transform:none;opacity:1}}
+.p-row .p-avatar{font-size:20px;line-height:1;}
+.p-row .p-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.p-row .p-score{color:var(--gb4);min-width:54px;text-align:right;}
+.p-del{background:var(--red);color:#fff;border:none;font-family:'Press Start 2P',monospace;font-size:7px;padding:3px 6px;cursor:pointer;border-radius:2px;}
+.start-big{width:100%;padding:11px;font-size:10px;background:var(--gb0);color:var(--gb5);border:3px solid var(--gb1);font-family:'Press Start 2P',monospace;cursor:pointer;border-radius:3px;animation:startPulse 2s ease-in-out infinite;}
+@keyframes startPulse{0%,100%{box-shadow:0 0 0 0 rgba(139,188,15,.5)}50%{box-shadow:0 0 0 7px rgba(139,188,15,0)}}
+.lobby-hint{font-size:6px;color:var(--gb2);text-align:center;line-height:2;}
+/* BATTLE */
+#pg-battle{background:var(--gb4);position:absolute;inset:0;}
+.b-sky{position:absolute;top:0;left:0;right:0;height:55%;background:linear-gradient(to bottom,var(--gb3) 0%,var(--gb4) 100%);overflow:hidden;}
+.pixel-cloud{position:absolute;background:var(--gb5);box-shadow:6px 0 0 var(--gb5),12px 0 0 var(--gb5),-6px 0 0 var(--gb5),0 -6px 0 var(--gb5),6px -6px 0 var(--gb5),0 6px 0 var(--gb6);width:6px;height:6px;animation:cloudDrift linear infinite;opacity:.7;}
+@keyframes cloudDrift{from{transform:translateX(0)}to{transform:translateX(-120%)}}
+.b-ground{position:absolute;bottom:0;left:0;right:0;height:46%;background:var(--gb3);border-top:4px solid var(--gb1);}
+.b-ground::before{content:'';position:absolute;top:0;left:0;right:0;height:8px;background:repeating-linear-gradient(90deg,var(--gb2) 0px,var(--gb2) 10px,transparent 10px,transparent 20px);opacity:.4;}
+.grass-tuft{position:absolute;bottom:0;width:8px;height:14px;background:var(--gb2);clip-path:polygon(50% 0%,0% 100%,100% 100%);}
+.pokemon-arena{position:absolute;left:6%;bottom:42%;width:28%;display:flex;flex-direction:column;align-items:center;}
+.pokemon-platform{width:120%;height:10px;background:var(--gb2);border-radius:50%;box-shadow:0 4px 0 var(--gb1);margin-top:3px;}
+.poke-svg-wrap{width:100%;filter:drop-shadow(3px 4px 0 var(--gb1));transform-origin:bottom center;}
+.poke-svg-wrap.silhouette svg{filter:brightness(0) saturate(0);}
+.poke-svg-wrap.revealed svg{animation:revealFlash .6s steps(1,end);}
+@keyframes revealFlash{0%{filter:brightness(10)}25%{filter:brightness(0) saturate(0)}50%{filter:brightness(10)}75%{filter:none}100%{filter:none}}
+.poke-idle{animation:pokeIdle 2s ease-in-out infinite;}
+@keyframes pokeIdle{0%,100%{transform:translateY(0) scaleX(1)}40%{transform:translateY(-6px) scaleX(1.02)}80%{transform:translateY(-3px) scaleX(.98)}}
+.trainer-arena{position:absolute;right:6%;bottom:42%;width:22%;display:flex;flex-direction:column;align-items:center;}
+.trainer-platform{width:130%;height:8px;background:var(--gb1);border-radius:50%;box-shadow:0 3px 0 var(--gb0);margin-top:3px;}
+.trainer-svg{width:100%;filter:drop-shadow(3px 4px 0 var(--gb0));animation:trainerBob 1.5s ease-in-out infinite;}
+@keyframes trainerBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.b-hud-top{position:absolute;top:5px;left:6px;right:6px;display:flex;align-items:center;gap:6px;z-index:10;}
+.ost-badge{background:var(--gb0);color:var(--gb5);font-size:10px;padding:4px 10px;border-radius:2px;border:2px solid var(--gb2);}
+.event-pill{background:var(--gold);color:var(--gb0);font-size:8px;padding:4px 10px;border-radius:2px;display:none;animation:eventPill .5s steps(1,end) infinite;}
+.event-pill.show{display:block;}
+@keyframes eventPill{0%,100%{opacity:1}50%{opacity:.4}}
+.host-actions{margin-left:auto;display:flex;gap:5px;}
+.h-btn{background:var(--gb0);color:var(--gb5);border:2px solid var(--gb2);font-family:'Press Start 2P',monospace;font-size:8px;padding:5px 10px;cursor:pointer;border-radius:2px;transition:background .1s;}
+.h-btn:hover{background:var(--gb2);}
+.timer-wrap{position:absolute;top:32px;left:6px;right:6px;z-index:10;}
+.timer-row{display:flex;justify-content:space-between;font-size:10px;color:var(--gb0);margin-bottom:3px;}
+.timer-track{height:12px;background:var(--gb2);border:2px solid var(--gb0);border-radius:2px;overflow:hidden;}
+.timer-fill{height:100%;background:var(--gb0);transition:width 1s linear;border-radius:2px;position:relative;}
+.timer-fill::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0,transparent 5px,rgba(255,255,255,.15) 5px,rgba(255,255,255,.15) 6px);}
+.timer-fill.warn{background:var(--gold);}
+.timer-fill.danger{background:var(--red);animation:dangerFlash .4s step-end infinite;}
+@keyframes dangerFlash{0%,100%{opacity:1}50%{opacity:.3}}
+/* Answer progress */
+.ans-progress{position:absolute;top:58px;left:6px;right:6px;z-index:10;}
+.ans-progress-track{height:4px;background:rgba(15,26,15,.4);border-radius:1px;overflow:hidden;}
+.ans-progress-fill{height:100%;background:var(--gb5);border-radius:1px;width:0%;transition:width .3s;}
+.ans-progress-label{font-size:6px;color:var(--gb1);text-align:right;margin-top:2px;}
+.encounter-msg{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:clamp(11px,3vw,16px);color:var(--gb0);text-align:center;line-height:2;z-index:50;pointer-events:none;opacity:0;}
+.encounter-msg.show{animation:encAnim 2.8s ease-out forwards;}
+@keyframes encAnim{0%{opacity:0;transform:translate(-50%,-40%)}20%{opacity:1;transform:translate(-50%,-50%)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%)}}
+.b-ui{position:absolute;bottom:0;left:0;right:0;height:40%;background:var(--gb4);border-top:4px solid var(--gb0);display:grid;grid-template-columns:1fr 1fr;}
+.ui-box{padding:6px 8px;border-right:3px solid var(--gb0);display:flex;flex-direction:column;gap:3px;overflow:hidden;}
+.ui-box:last-child{border-right:none;}
+.ui-title{font-size:10px;color:var(--gb0);border-bottom:2px solid var(--gb2);padding-bottom:3px;margin-bottom:2px;}
+.wave-bars{display:flex;align-items:flex-end;gap:3px;height:20px;}
+.wb{width:5px;background:var(--gb0);border-radius:2px;animation:waveAnim .7s ease-in-out infinite alternate;}
+.wb:nth-child(1){height:7px;animation-delay:.0s}.wb:nth-child(2){height:15px;animation-delay:.1s}.wb:nth-child(3){height:10px;animation-delay:.15s}.wb:nth-child(4){height:18px;animation-delay:.05s}.wb:nth-child(5){height:8px;animation-delay:.2s}.wb:nth-child(6){height:14px;animation-delay:.12s}.wb:nth-child(7){height:7px;animation-delay:.08s}
+@keyframes waveAnim{from{transform:scaleY(.4)}to{transform:scaleY(1)}}
+.mini-scores{flex:1;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:3px;}
+.ms-row{display:flex;gap:4px;align-items:center;font-size:8px;color:var(--gb0);padding:3px 4px;border-radius:2px;flex-shrink:0;}
+.ms-row.top1{background:rgba(232,192,32,.25);}
+.ms-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ms-pts{color:var(--gb1);font-size:8px;}
+/* HOST ANSWERS PANEL inside battle */
+.host-answers-live{position:absolute;bottom:41%;left:0;right:0;background:rgba(15,26,15,.9);border-top:2px solid var(--gb1);border-bottom:2px solid var(--gb0);padding:4px 7px;max-height:100px;overflow-y:auto;z-index:12;display:none;}
+.host-mode .host-answers-live{display:block;}
+/* ANSWER OVERLAY */
+.answer-overlay{position:absolute;bottom:0;left:0;right:0;background:var(--gb4);border-top:4px solid var(--gb0);padding:7px 10px;z-index:100;display:none;}
+.answer-overlay.show{display:block;}
+.ans-head{display:flex;justify-content:space-between;font-size:10px;color:var(--gb0);margin-bottom:6px;}
+.ans-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.ans-opt{background:var(--gb0);color:var(--gb5);border:3px solid var(--gb1);font-family:'Press Start 2P',monospace;font-size:9px;padding:9px 12px;cursor:pointer;border-radius:3px;text-align:left;line-height:1.8;transition:all .1s;position:relative;overflow:hidden;}
+.ans-opt::before{content:attr(data-letter);position:absolute;top:3px;right:6px;font-size:7px;color:var(--gb3);}
+.ans-opt:hover{background:var(--gb1);border-color:var(--gb4);}
+.ans-opt.sel{background:var(--gb1);border-color:var(--gb5);}
+.ans-opt.correct{background:var(--gb1);border-color:var(--gb5);color:var(--gb7);}
+.ans-opt.wrong{background:#330000;border-color:var(--red);color:#ff8888;}
+/* EVENT MODAL */
+.event-modal{position:absolute;inset:0;background:rgba(0,10,0,.85);z-index:180;display:none;align-items:center;justify-content:center;}
+.event-modal.show{display:flex;}
+.event-card{background:var(--gb0);border:4px solid var(--gb4);padding:14px 18px;text-align:center;border-radius:4px;width:80%;transform:scale(0);transition:transform .35s cubic-bezier(.34,1.56,.64,1);}
+.event-modal.show .event-card{transform:scale(1);}
+.ev-icon{font-size:34px;margin-bottom:8px;}
+.ev-title{font-size:10px;color:var(--gb5);line-height:1.8;margin-bottom:6px;}
+.ev-desc{font-size:7px;color:var(--gb3);line-height:1.8;}
+/* POKEBALL */
+.pokeball-throw{position:absolute;right:26%;bottom:52%;width:28px;height:28px;opacity:0;z-index:60;pointer-events:none;}
+.pokeball-throw.active{animation:pbThrow 1.4s ease-in-out forwards;}
+@keyframes pbThrow{0%{opacity:1;right:26%;bottom:52%;transform:scale(.5) rotate(0deg);}35%{right:50%;bottom:62%;transform:scale(1) rotate(400deg);}65%{right:68%;bottom:46%;transform:scale(.7) rotate(600deg);}100%{right:67%;bottom:44%;transform:scale(.8) rotate(620deg);opacity:1;}}
+/* PARTICLES */
+.particle{position:absolute;width:5px;height:5px;pointer-events:none;z-index:70;}
+/* SHAKE */
+.screen.shake{animation:screenShake .4s ease-out;}
+@keyframes screenShake{0%{transform:translate(0,0)}15%{transform:translate(-5px,3px)}30%{transform:translate(5px,-3px)}45%{transform:translate(-4px,4px)}60%{transform:translate(4px,-2px)}100%{transform:translate(0,0)}}
+/* FLASH */
+.flash{position:absolute;inset:0;background:#e8f0c8;opacity:0;pointer-events:none;z-index:300;}
+.flash.fire{animation:flashAnim .5s ease-out forwards;}
+@keyframes flashAnim{0%{opacity:.95}100%{opacity:0}}
+/* FADE */
+.gb-fade{position:absolute;inset:0;background:var(--gb0);opacity:0;pointer-events:none;z-index:400;}
+/* REVEAL */
+#pg-reveal{background:var(--gb4);padding:10px;justify-content:flex-start;gap:7px;}
+.rev-head{width:100%;font-size:9px;color:var(--gb0);text-align:center;border-bottom:3px solid var(--gb0);padding-bottom:6px;line-height:1.8;}
+.rev-pokemon{width:90px;height:90px;filter:drop-shadow(4px 5px 0 var(--gb0));animation:revFloat 2s ease-in-out infinite;flex-shrink:0;}
+@keyframes revFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.rev-ost-name{font-size:clamp(9px,2.5vw,12px);color:var(--gb0);text-align:center;line-height:1.8;}
+.rev-game{font-size:7px;color:var(--gb1);text-align:center;line-height:1.8;}
+.sb{width:100%;flex:1;border:3px solid var(--gb0);border-radius:3px;overflow:hidden;display:flex;flex-direction:column;}
+.sb-head{background:var(--gb0);color:var(--gb5);font-size:7px;padding:5px 9px;display:grid;grid-template-columns:22px 1fr auto;gap:6px;flex-shrink:0;}
+.sb-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;}
+.sb-row{display:grid;grid-template-columns:22px 1fr auto;gap:6px;padding:5px 9px;font-size:7px;border-bottom:1px solid var(--gb2);align-items:center;}
+.sb-row:last-child{border-bottom:none;}
+.sb-row.gold{background:rgba(232,192,32,.15);}
+.sb-rank{color:var(--gb2);}.sb-name{color:var(--gb0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.sb-pts{color:var(--gb0);}
+.rev-actions{display:flex;gap:5px;width:100%;}
+/* FINAL */
+#pg-final{background:var(--gb4);padding:10px;justify-content:flex-start;gap:7px;}
+.final-title{font-size:10px;color:var(--gb0);text-align:center;border-bottom:3px solid var(--gb0);padding-bottom:6px;width:100%;line-height:1.8;}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:8px;width:100%;}
+.pod-col{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.pod-sprite{font-size:28px;}.pod-name{font-size:6px;color:var(--gb0);text-align:center;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.pod-pts{font-size:6px;color:var(--gb1);}
+.pod-block{display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:3px 3px 0 0;width:80px;}
+.pod-1 .pod-block{height:68px;background:var(--gb0);color:var(--gold);}.pod-2 .pod-block{height:50px;background:var(--gb1);color:#ccc;}.pod-3 .pod-block{height:36px;background:var(--gb2);color:#cd7f32;}
+.full-sb{width:100%;flex:1;overflow-y:auto;border:3px solid var(--gb0);border-radius:3px;}
+/* CONTROLS */
+.gb-controls{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 8px 6px;}
+/* dpad — voir plus haut (Pokégraph skin section) */
+.ss-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;padding:0 10px;}
+.ss-btns{display:flex;gap:16px;}
+.ss-btn{background:linear-gradient(to bottom,#777,#444);border:none;border-radius:20px;width:52px;height:13px;box-shadow:0 2px 4px rgba(0,0,0,.5);cursor:pointer;font-family:'Press Start 2P',monospace;font-size:6px;color:#bbb;transition:transform .1s;}
+.ss-btn:active{transform:translateY(1px);}
+.gb-brand{font-size:10px;color:#888878;letter-spacing:1px;margin-top:3px;}
+.ab-wrap{display:flex;gap:10px;align-items:center;flex-shrink:0;margin-top:8px;}
+.btn-b,.btn-a{border:none;border-radius:50%;font-family:'Press Start 2P',monospace;font-size:10px;color:#fff;cursor:pointer;box-shadow:inset 0 2px 3px rgba(255,255,255,.25),0 5px 0 rgba(0,0,0,.5);transition:all .1s;display:flex;align-items:center;justify-content:center;}
+.btn-b{width:42px;height:42px;margin-top:10px;background:radial-gradient(circle at 35% 35%,#cc2200,#661100);}
+.btn-a{width:50px;height:50px;background:radial-gradient(circle at 35% 35%,#cc2200,#661100);}
+.btn-b:active,.btn-a:active{box-shadow:inset 0 2px 3px rgba(0,0,0,.3),0 2px 0 rgba(0,0,0,.4);transform:translateY(3px);}
+/* HOST MODE */
+.host-only{display:none !important;}
+.host-mode .host-only{display:flex !important;}
+.host-mode .host-only-block{display:block !important;}
+.host-only-block{display:none !important;}
+.host-mode #start-locked{display:none !important;}
+/* HOST BADGE */
+.host-badge{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--gb0);font-family:'Press Start 2P',monospace;font-size:8px;padding:6px 14px;border-radius:3px;z-index:4000;box-shadow:0 2px 8px rgba(232,192,32,.4);display:none;gap:8px;align-items:center;}
+.host-badge.show{display:flex;}
+.host-badge-dot{width:8px;height:8px;border-radius:50%;background:var(--gb0);animation:badgePulse 1.5s ease-in-out infinite;}
+@keyframes badgePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+/* NOTIFY */
+.notif{position:fixed;bottom:16px;right:16px;background:var(--gb0);color:var(--gb5);font-size:9px;padding:8px 14px;border:2px solid var(--gb4);border-radius:2px;z-index:10000;transform:translateX(130%);transition:transform .25s;max-width:200px;line-height:1.8;}
+.notif.show{transform:translateX(0);}
+/* EXT PANELS */
+.ext-wrap{width:min(var(--screen-w),96vw);margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ext-panel{background:rgba(10,26,10,.7);border:1px solid rgba(45,90,39,.4);border-radius:4px;padding:8px 10px;}
+.ext-title{font-size:9px;color:var(--gb4);border-bottom:1px solid rgba(45,90,39,.4);padding-bottom:5px;margin-bottom:6px;}
+.ost-grid{display:flex;flex-direction:column;gap:2px;max-height:150px;overflow-y:auto;scrollbar-width:thin;}
+.ost-row{font-size:8px;color:rgba(139,188,15,.5);padding:2px 4px;border-left:2px solid rgba(45,90,39,.3);line-height:1.6;transition:all .3s;}
+.ost-row.played{color:var(--gb5);border-left-color:var(--gb4);background:rgba(139,188,15,.08);}
+.ost-row.current{color:var(--gb7);border-left-color:var(--gb6);background:rgba(139,188,15,.15);animation:currentBlink .8s step-end infinite;}
+@keyframes currentBlink{0%,100%{opacity:1}50%{opacity:.6}}
+.legend-grid{display:flex;flex-direction:column;gap:3px;}
+.legend-row{font-size:8px;color:var(--gb3);line-height:1.8;display:flex;gap:4px;align-items:flex-start;}
+/* ── PROFESSOR PAGE ─────────────────────────────── */
+#pg-prof{
+  background:var(--gb0);
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  align-items:center;justify-content:flex-end;
+  overflow:hidden;
+}
+#pg-prof.active{ display:flex; }
+
+/* Animated background — subtle grid */
+.prof-bg{
+  position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(0deg,transparent 0,transparent 7px,rgba(139,188,15,.06) 7px,rgba(139,188,15,.06) 8px),
+    repeating-linear-gradient(90deg,transparent 0,transparent 7px,rgba(139,188,15,.06) 7px,rgba(139,188,15,.06) 8px);
+  animation:bgScroll 8s linear infinite;
+}
+@keyframes bgScroll{from{background-position:0 0,0 0}to{background-position:0 80px,80px 0}}
+
+/* Professor sprite container */
+.prof-stage{
+  position:absolute;
+  bottom:105px;
+  left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;
+  animation:profEntry .6s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes profEntry{from{transform:translateX(-50%) translateY(30px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+
+.prof-name-tag{
+  background:var(--gb0);
+  border:2px solid var(--gb4);
+  color:var(--gb5);
+  font-size:5px;
+  padding:2px 8px;
+  border-radius:1px;
+  margin-bottom:4px;
+  letter-spacing:1px;
+}
+
+/* Dialog box — classic RPG style */
+.prof-dialog{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  background:var(--gb7);
+  border-top:4px solid var(--gb0);
+  padding:10px 14px 12px;
+  min-height:100px;
+  z-index:10;
+}
+.prof-dialog-inner{
+  border:3px solid var(--gb0);
+  border-radius:2px;
+  padding:8px 10px;
+  background:var(--gb6);
+  min-height:70px;
+  position:relative;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+.prof-text{
+  font-size:6px;
+  color:var(--gb0);
+  line-height:2;
+  min-height:40px;
+  word-break:break-word;
+}
+.prof-cursor{
+  display:inline-block;
+  width:7px;height:7px;
+  border-right:3px solid var(--gb0);
+  border-bottom:3px solid var(--gb0);
+  transform:rotate(45deg) translateY(-2px);
+  margin-left:4px;
+  animation:cursorBlink .6s step-end infinite;
+  vertical-align:middle;
+  opacity:0;
+}
+.prof-cursor.show{ opacity:1; }
+@keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
+
+.prof-hint{
+  font-size:4px;
+  color:var(--gb2);
+  text-align:right;
+  margin-top:4px;
+  animation:hintBlink 1.2s ease-in-out infinite;
+}
+@keyframes hintBlink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Progress dots */
+.prof-dots{
+  display:flex;gap:4px;justify-content:center;
+  margin-top:5px;
+}
+.prof-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--gb2);transition:background .3s;
+}
+.prof-dot.done{ background:var(--gb0); }
+.prof-dot.active{ background:var(--gb4); animation:dotPulse .6s ease-in-out infinite alternate; }
+@keyframes dotPulse{from{transform:scale(1)}to{transform:scale(1.4)}}
+
+/* Firebase config warning */
+.config-warning{background:rgba(204,34,0,.15);border:2px solid var(--red);border-radius:3px;padding:10px 12px;font-size:5px;color:#ff8844;line-height:2;text-align:center;width:min(var(--screen-w),96vw);margin-bottom:10px;display:none;}
+.config-warning.show{display:block;}
+/* Smooth theme transitions */
+.screen, .b-ui, .ans-opt, .gb-btn, .h-btn, .p-row, .sb-row, .timer-fill, .b-ground {
+  transition: background-color .8s ease, border-color .8s ease, color .6s ease;
+}
+
+/* Confetti fall */
+@keyframes confettiFall {
+  0%   { transform: translateX(0) rotate(0deg);   opacity: 1; top: -4px; }
+  100% { transform: translateX(var(--tx)) rotate(540deg); opacity: 0; top: 105%; }
+}
+
+/* Gen badge */
+#gen-badge { transition: opacity .3s ease; }
+
+/* Reset confirm dialog */
+.reset-dialog{position:fixed;inset:0;background:rgba(0,5,0,.92);z-index:6000;display:none;align-items:center;justify-content:center;}
+.reset-dialog.show{display:flex;}
+.reset-card{background:var(--gb0);border:3px solid var(--red);border-radius:4px;padding:18px 22px;text-align:center;width:min(320px,90vw);animation:lockCardIn .25s ease-out;}
+@keyframes lockCardIn{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+.reset-title{font-size:8px;color:#ff6644;line-height:1.8;margin-bottom:6px;}
+.reset-sub{font-size:5px;color:var(--gb3);line-height:2;margin-bottom:14px;}
+.reset-btns{display:flex;gap:8px;justify-content:center;}
+.r-btn{background:var(--red);color:#fff;border:2px solid #ff4422;font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;border-radius:2px;}
+.r-btn-cancel{background:var(--gb1);color:var(--gb4);border:2px solid var(--gb2);font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- Script autonome — fonctionne sans Firebase, gère les interactions UI de base -->
+<script>
+// État genre partagé (lu par le module ES via window.GB_GENDER)
+window.GB_GENDER = 'm';
+
+function gbSelectGender(g){
+  window.GB_GENDER = g;
+  const btnM = document.getElementById('gbtn-m');
+  const btnF = document.getElementById('gbtn-f');
+  if(btnM) btnM.classList.toggle('active', g==='m');
+  if(btnF) btnF.classList.toggle('active', g==='f');
+  // Bip si AudioContext dispo
+  try{
+    const ac = new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(), gn=ac.createGain();
+    o.type='square'; o.frequency.value = g==='f'?880:660;
+    gn.gain.setValueAtTime(.06,ac.currentTime);
+    gn.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.08);
+    o.connect(gn); gn.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime+.08);
+  }catch(e){}
+}
+</script>
+
+<!-- Firebase config warning -->
+<div class="config-warning" id="config-warn">
+  ⚠️ FIREBASE NON CONFIGURÉ — Remplace les valeurs dans le code<br>
+  <span style="font-size:8px">Voir le fichier README ci-dessous pour les instructions</span>
+</div>
+
+<!-- GAMEBOY -->
+<div class="gb-shell">
+  <div class="bezel">
+    <div class="bezel-label">DOT MATRIX WITH STEREO SOUND</div>
+    <div class="power-led"></div>
+    <div class="screen" id="screen">
+
+      <!-- ── CONNECT ─────────────────────────────── -->
+      <div class="page active" id="pg-connect">
+        <!-- Animated starfield background -->
+        <canvas id="star-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
+
+        <!-- Floating Pokéballs -->
+        <div class="pokeball-deco pb1">
+          <svg viewBox="0 0 40 40" width="100%" height="100%">
+            <circle cx="20" cy="20" r="19" fill="#cc2200" stroke="#111" stroke-width="2"/>
+            <rect x="1" y="18" width="38" height="4" fill="#111"/>
+            <circle cx="20" cy="20" r="7" fill="#fff" stroke="#111" stroke-width="2"/>
+            <circle cx="20" cy="20" r="3" fill="#eee" stroke="#111" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="pokeball-deco pb2">
+          <svg viewBox="0 0 40 40" width="100%" height="100%">
+            <circle cx="20" cy="20" r="19" fill="#cc2200" stroke="#111" stroke-width="2"/>
+            <rect x="1" y="18" width="38" height="4" fill="#111"/>
+            <circle cx="20" cy="20" r="7" fill="#fff" stroke="#111" stroke-width="2"/>
+            <circle cx="20" cy="20" r="3" fill="#eee" stroke="#111" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="pokeball-deco pb3">
+          <svg viewBox="0 0 40 40" width="100%" height="100%">
+            <circle cx="20" cy="20" r="19" fill="#1a1a80" stroke="#111" stroke-width="2"/>
+            <rect x="1" y="18" width="38" height="4" fill="#111"/>
+            <circle cx="20" cy="20" r="7" fill="#fff" stroke="#111" stroke-width="2"/>
+            <circle cx="20" cy="20" r="3" fill="#eee" stroke="#111" stroke-width="1.5"/>
+          </svg>
+        </div>
+
+        <!-- Title block -->
+        <div class="connect-hero" style="position:relative;z-index:1;text-align:center;">
+          <div class="hero-badge">✦ 30ème ANNIVERSAIRE ✦</div>
+          <div class="hero-title">POKÉMON</div>
+          <div class="hero-sub">OST BLINDTEST</div>
+          <div class="hero-stars">★ ★ ★ ★ ★</div>
+        </div>
+
+        <!-- Form area -->
+        <div class="connect-form" style="position:relative;z-index:1;width:100%;display:flex;flex-direction:column;gap:7px;">
+          <div class="gender-row">
+            <div class="gender-label">DRESSEUR :</div>
+            <div class="gender-btns">
+              <button class="gender-btn active" id="gbtn-m" onclick="gbSelectGender('m')">
+                <svg width="32" height="44" viewBox="0 0 40 68">
+                  <rect x="12" y="28" width="16" height="20" rx="3" fill="#2255cc"/>
+                  <rect x="17" y="28" width="6" height="5" rx="1" fill="#fff"/>
+                  <ellipse cx="20" cy="15" rx="9" ry="9" fill="#e8b878"/>
+                  <rect x="11" y="4" width="18" height="7" rx="3" fill="#cc2200"/>
+                  <rect x="9" y="9" width="22" height="3" rx="1" fill="#cc2200"/>
+                  <ellipse cx="16" cy="15" rx="2" ry="2.5" fill="#111"/>
+                  <ellipse cx="24" cy="15" rx="2" ry="2.5" fill="#111"/>
+                  <circle cx="17" cy="14" r=".8" fill="#fff"/>
+                  <circle cx="25" cy="14" r=".8" fill="#fff"/>
+                  <path d="M15 19 Q20 23 25 19" stroke="#a06040" stroke-width="1.5" fill="none"/>
+                  <ellipse cx="13" cy="17" rx="2.5" ry="1.5" fill="#ff9090" opacity=".5"/>
+                  <ellipse cx="27" cy="17" rx="2.5" ry="1.5" fill="#ff9090" opacity=".5"/>
+                  <rect x="13" y="48" width="6" height="14" rx="2" fill="#333355"/>
+                  <rect x="21" y="48" width="6" height="14" rx="2" fill="#333355"/>
+                </svg>
+                <span>GARÇON</span>
+              </button>
+              <button class="gender-btn" id="gbtn-f" onclick="gbSelectGender('f')">
+                <svg width="32" height="44" viewBox="0 0 40 68">
+                  <rect x="11" y="28" width="18" height="22" rx="4" fill="#cc3399"/>
+                  <ellipse cx="20" cy="50" rx="12" ry="5" fill="#dd44aa"/>
+                  <rect x="16" y="28" width="8" height="10" rx="2" fill="#fff"/>
+                  <ellipse cx="20" cy="32" rx="4" ry="3" fill="#ff66bb"/>
+                  <ellipse cx="20" cy="15" rx="9" ry="9" fill="#f4c8a0"/>
+                  <ellipse cx="20" cy="8" rx="10" ry="5" fill="#1a0a00"/>
+                  <rect x="10" y="5" width="6" height="16" rx="3" fill="#1a0a00"/>
+                  <rect x="24" y="5" width="6" height="18" rx="3" fill="#1a0a00"/>
+                  <ellipse cx="20" cy="7" rx="11" ry="4" fill="#f0f0f0"/>
+                  <rect x="10" y="5.5" width="20" height="2" fill="#ff88cc"/>
+                  <ellipse cx="16" cy="15" rx="2" ry="2" fill="#111"/>
+                  <ellipse cx="24" cy="15" rx="2" ry="2" fill="#111"/>
+                  <circle cx="17" cy="14" r=".7" fill="#fff"/>
+                  <circle cx="25" cy="14" r=".7" fill="#fff"/>
+                  <path d="M15 18 Q20 21 25 18" stroke="#c06050" stroke-width="1.5" fill="none"/>
+                  <ellipse cx="13" cy="17" rx="2" ry="1.5" fill="#ffaaaa" opacity=".5"/>
+                  <ellipse cx="27" cy="17" rx="2" ry="1.5" fill="#ffaaaa" opacity=".5"/>
+                  <rect x="13" y="50" width="5" height="13" rx="2" fill="#cc3399"/>
+                  <rect x="22" y="50" width="5" height="13" rx="2" fill="#cc3399"/>
+                </svg>
+                <span>FILLE</span>
+              </button>
+            </div>
+          </div>
+          <div class="connect-row">
+            <input class="gb-input" id="join-name" placeholder="Ton pseudo..." maxlength="14" autocomplete="off">
+          </div>
+          <div class="connect-row">
+            <input class="gb-input pass-inp" id="join-pass" type="password" placeholder="Animateur? → mot de passe" maxlength="20" autocomplete="off">
+          </div>
+          <button class="gb-btn" style="width:100%;font-size:9px;padding:10px;" onclick="gbJoin()">▶ REJOINDRE</button>
+          <div class="connect-hint">
+            Laisse le mot de passe vide si tu es joueur<br>
+            Entre le code animateur pour gérer la partie
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PROFESSEUR GRAPH ───────────────────────── -->
+      <div class="page" id="pg-prof">
+        <div class="prof-bg"></div>
+
+        <!-- Professor — redesigned with personality -->
+        <div class="prof-stage" id="prof-stage">
+          <div class="prof-name-tag">Dr. GRAPH</div>
+          <svg width="110" height="160" viewBox="0 0 70 105" xmlns="http://www.w3.org/2000/svg">
+            <!-- Jambes pantalon -->
+            <rect x="22" y="72" width="11" height="22" rx="3" fill="#334466"/>
+            <rect x="37" y="72" width="11" height="22" rx="3" fill="#334466"/>
+            <!-- Chaussures -->
+            <ellipse cx="27" cy="95" rx="8" ry="4" fill="#111"/>
+            <ellipse cx="43" cy="95" rx="8" ry="4" fill="#111"/>
+            <!-- Blouse longue -->
+            <rect x="14" y="36" width="42" height="40" rx="5" fill="#f0f4e8"/>
+            <rect x="14" y="36" width="42" height="10" rx="3" fill="#e0ecd0"/>
+            <!-- Revers de blouse -->
+            <path d="M28 36 L24 50 L35 46 Z" fill="#d0e4b8"/>
+            <path d="M42 36 L46 50 L35 46 Z" fill="#d0e4b8"/>
+            <!-- Chemise & cravate verte -->
+            <rect x="29" y="36" width="12" height="30" rx="2" fill="#c8dca0"/>
+            <path d="M33 37 L35 55 L37 37 Z" fill="#2d5a27"/>
+            <!-- Nœud de cravate -->
+            <ellipse cx="35" cy="38" rx="3" ry="2.5" fill="#2d5a27"/>
+            <!-- Poche blouse gauche (avec stylo) -->
+            <rect x="16" y="50" width="10" height="13" rx="2" fill="#e0ecd0" stroke="#c8d8a0" stroke-width="1"/>
+            <rect x="19" y="49" width="2" height="8" rx="1" fill="#3366cc"/>
+            <rect x="22" y="49" width="2" height="6" rx="1" fill="#cc2200"/>
+            <!-- Bras gauche (levé, enthousiaste) -->
+            <rect x="4" y="33" width="10" height="18" rx="5" fill="#f0f4e8" transform="rotate(-35 4 33)"/>
+            <ellipse cx="5" cy="28" rx="5" ry="6" fill="#d4a878" transform="rotate(-20 5 28)"/>
+            <!-- Bras droit (tenu vers l'avant) -->
+            <rect x="56" y="38" width="10" height="18" rx="5" fill="#f0f4e8"/>
+            <ellipse cx="62" cy="54" rx="5" ry="5" fill="#d4a878"/>
+            <!-- Cou -->
+            <rect x="30" y="26" width="10" height="11" rx="3" fill="#d4a878"/>
+            <!-- Tête -->
+            <ellipse cx="35" cy="18" rx="14" ry="14" fill="#d4a878"/>
+            <!-- Oreilles -->
+            <ellipse cx="21" cy="18" rx="4" ry="5" fill="#d4a878"/>
+            <ellipse cx="49" cy="18" rx="4" ry="5" fill="#d4a878"/>
+            <!-- Cheveux blancs soignés -->
+            <ellipse cx="35" cy="6" rx="14" ry="7" fill="#e8e8e0"/>
+            <rect x="21" y="4" width="28" height="8" rx="4" fill="#e8e8e0"/>
+            <!-- Mèche distinctive -->
+            <path d="M22 6 Q25 2 29 5" stroke="#d0d0c8" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <!-- Sourcils bienveillants (légèrement arqués) -->
+            <path d="M24 12 Q27 10 30 12" stroke="#888878" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M40 12 Q43 10 46 12" stroke="#888878" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- Lunettes rondes (style académique) -->
+            <circle cx="28" cy="18" r="6" fill="rgba(200,230,255,.2)" stroke="#44331a" stroke-width="1.8"/>
+            <circle cx="42" cy="18" r="6" fill="rgba(200,230,255,.2)" stroke="#44331a" stroke-width="1.8"/>
+            <rect x="34" y="17" width="8" height="2" rx="1" fill="#44331a"/>
+            <rect x="14" y="17" width="8" height="2" rx="1" fill="#44331a"/>
+            <rect x="48" y="17" width="8" height="2" rx="1" fill="#44331a"/>
+            <!-- Reflets lunettes -->
+            <path d="M24 14 Q26 13 27 15" stroke="rgba(255,255,255,.7)" stroke-width="1" fill="none"/>
+            <path d="M38 14 Q40 13 41 15" stroke="rgba(255,255,255,.7)" stroke-width="1" fill="none"/>
+            <!-- Yeux souriants (plissés bienveillants) -->
+            <path d="M25 18 Q28 21 31 18" stroke="#111" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <path d="M39 18 Q42 21 45 18" stroke="#111" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <!-- Petit nez -->
+            <ellipse cx="35" cy="21" rx="2" ry="1.5" fill="#c09060" opacity=".6"/>
+            <!-- Moustache blanche en guidon -->
+            <path d="M26 24 Q30 22 35 24 Q40 22 44 24" stroke="#d0d0c8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <!-- Sourire chaleureux -->
+            <path d="M28 27 Q35 31 42 27" stroke="#a06040" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- Joues roses légères -->
+            <ellipse cx="23" cy="23" rx="4" ry="3" fill="#ffb0a0" opacity=".35"/>
+            <ellipse cx="47" cy="23" rx="4" ry="3" fill="#ffb0a0" opacity=".35"/>
+          </svg>
+        </div>
+
+        <!-- Dialog box -->
+        <div class="prof-dialog">
+          <div class="prof-dialog-inner">
+            <div class="prof-text" id="prof-text"></div>
+            <span class="prof-cursor" id="prof-cursor"></span>
+            <div class="prof-hint" id="prof-hint">▼ Appuyer sur A pour continuer</div>
+          </div>
+          <div class="prof-dots" id="prof-dots"></div>
+        </div>
+      </div>
+
+      <!-- ── LOBBY ──────────────────────────────────── -->
+      <div class="page" id="pg-lobby">
+        <div class="lobby-head">
+          ⚡ SALLE D'ATTENTE ⚡<br>
+          <span style="font-size:5px;color:var(--gb1)">JOUEURS : <span id="lobby-count">0</span></span>
+        </div>
+        <div class="players-scroll" id="players-list"></div>
+        <button class="start-big host-only-block" onclick="gbStart()">▶ LANCER LE BLINDTEST</button>
+        <div id="start-locked" style="width:100%;padding:7px;background:var(--gb1);border-radius:2px;font-size:5px;color:var(--gb2);text-align:center;line-height:2;">
+          ⏳ EN ATTENTE DU LANCEMENT<br>
+          <span style="font-size:8px">L'animateur va démarrer la partie</span>
+        </div>
+        <!-- Host reset button -->
+        <button class="host-only-block" id="btn-full-reset" onclick="confirmFullReset()"
+          style="width:100%;padding:5px;font-size:5px;background:rgba(204,34,0,.15);color:#ff6644;border:1px solid rgba(204,34,0,.4);font-family:'Press Start 2P',monospace;cursor:pointer;border-radius:2px;margin-top:2px;">
+          🗑️ RESET COMPLET (efface tout)
+        </button>
+        <div class="lobby-hint">
+          🎵 Partage d'écran Discord pour la musique<br>
+          🎲 Évènements spéciaux aléatoires · ⏱ 30 sec/OST
+        </div>
+      </div>
+
+      <!-- ── BATTLE ─────────────────────────────────── -->
+      <div class="page" id="pg-battle">
+        <div class="b-sky" id="b-sky"></div>
+        <div class="b-ground"></div>
+        <div class="pokemon-arena" id="poke-arena">
+          <div class="poke-svg-wrap silhouette poke-idle" id="poke-wrap"></div>
+          <div class="pokemon-platform"></div>
+        </div>
+        <div class="trainer-arena">
+          <svg class="trainer-svg" id="trainer-svg" viewBox="0 0 40 55" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="trainer-platform"></div>
+        </div>
+        <div class="b-hud-top">
+          <div class="ost-badge" id="ost-badge">OST 1/30</div>
+          <div class="event-pill" id="ev-pill">⚡ EVENT</div>
+          <div class="host-actions host-only">
+            <button class="h-btn" onclick="gbReveal()">🔍 RÉVÉLER</button>
+            <button class="h-btn" onclick="gbSkip()">⏭ SKIP</button>
+          </div>
+        </div>
+        <div class="timer-wrap">
+          <div class="timer-row"><span>TEMPS</span><span id="t-disp">30</span></div>
+          <div class="timer-track"><div class="timer-fill" id="t-fill" style="width:100%"></div></div>
+        </div>
+        <div class="ans-progress">
+          <div class="ans-progress-track"><div class="ans-progress-fill" id="answer-progress-bar"></div></div>
+          <div class="ans-progress-label" id="answer-progress-label">0/0 réponses</div>
+        </div>
+        <!-- Live answers panel (host only) -->
+        <div class="host-answers-live" id="host-answers-panel"></div>
+        <div class="encounter-msg" id="enc-msg">UN OST SAUVAGE<br>APPARAÎT !</div>
+        <div class="pokeball-throw" id="pb-throw">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="#e8f0c8" stroke-width="1.5"/><rect x="1" y="9" width="18" height="2" fill="#e8f0c8"/><path d="M1 10 Q5 4 10 1 Q15 4 19 10" fill="#cc2200"/><circle cx="10" cy="10" r="3.5" fill="#0f1a0f" stroke="#e8f0c8" stroke-width="1"/><circle cx="10" cy="10" r="1.5" fill="#e8f0c8"/></svg>
+        </div>
+        <div class="b-ui">
+          <div class="ui-box">
+            <div class="ui-title">🎵 EN COURS</div>
+            <div class="wave-bars"><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div></div>
+            <div style="font-size:4px;color:var(--gb1);margin-top:2px;line-height:1.8;">Origine : ???<br>Jeu : ???</div>
+          </div>
+          <div class="ui-box">
+            <div class="ui-title">📊 SCORES</div>
+            <div class="mini-scores" id="mini-scores"></div>
+          </div>
+        </div>
+        <div class="answer-overlay" id="ans-overlay">
+          <div class="ans-head"><span>QUE FAIRE ?</span><span id="ans-t">30</span></div>
+          <div class="ans-grid" id="ans-grid"></div>
+        </div>
+        <div class="event-modal" id="ev-modal">
+          <div class="event-card">
+            <div class="ev-icon" id="ev-icon">⚡</div>
+            <div class="ev-title" id="ev-title">ÉVÈNEMENT !</div>
+            <div class="ev-desc" id="ev-desc"></div>
+          </div>
+        </div>
+        <div class="flash" id="flash"></div>
+        <div class="gb-fade" id="fade-battle"></div>
+      </div>
+
+      <!-- ── REVEAL ──────────────────────────────────── -->
+      <div class="page" id="pg-reveal">
+        <div class="rev-head">🎉 OST CAPTURÉ !</div>
+        <svg class="rev-pokemon" id="rev-pokemon-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="rev-ost-name" id="rev-name">—</div>
+        <div class="rev-game" id="rev-game">—</div>
+        <div class="sb" id="sb">
+          <div class="sb-head"><span>#</span><span>JOUEUR</span><span>PTS</span></div>
+          <div class="sb-scroll" id="sb-rows"></div>
+        </div>
+        <div class="rev-actions host-only">
+          <button class="gb-btn" style="flex:1" onclick="gbNext()">▶ SUIVANT</button>
+          <button class="gb-btn" onclick="gbReset()">↺</button>
+        </div>
+        <div style="font-size:5px;color:var(--gb2);text-align:center;padding:3px 0;" id="waiting-next">⏳ En attente de l'animateur…</div>
+        <div class="gb-fade" id="fade-reveal"></div>
+      </div>
+
+      <!-- ── FINAL ──────────────────────────────────── -->
+      <div class="page" id="pg-final">
+        <div class="final-title">🏆 FIN DU BLINDTEST !<br>30 ANS DE POKÉMON</div>
+        <div class="podium" id="podium"></div>
+        <div class="full-sb" id="full-sb"></div>
+        <button class="start-big host-only-block" onclick="gbReset()" style="font-size:5px;margin-top:4px;">↺ REJOUER</button>
+      </div>
+
+    </div><!-- /screen -->
+  </div><!-- /bezel -->
+
+  <!-- Controls Pokégraph Edition -->
+  <div class="gb-controls">
+    <div class="dpad">
+      <div class="dp-up"    id="dp-up"    onclick="gbDpad('up')"   >▲</div>
+      <div class="dp-down"  id="dp-down"  onclick="gbDpad('down')" >▼</div>
+      <div class="dp-left"  id="dp-left"  onclick="gbDpad('left')" >◀</div>
+      <div class="dp-right" id="dp-right" onclick="gbDpad('right')">▶</div>
+      <div class="dp-c"></div>
+    </div>
+
+    <div class="ss-wrap">
+      <div class="ss-btns">
+        <button class="ss-btn">SELECT</button>
+        <button class="ss-btn" onclick="gbJoin()">START</button>
+      </div>
+
+      <!-- Logo Pokégraph sérigraphié sur la coque -->
+      <div class="pokegraph-brand">
+        <svg class="pg-logo-svg" width="130" height="28" viewBox="0 0 400 85" xmlns="http://www.w3.org/2000/svg">
+          <!-- Pokéball dans le O -->
+          <circle cx="44" cy="42" r="30" fill="#cc2200" stroke="#fff" stroke-width="3"/>
+          <rect x="14" y="39" width="60" height="7" fill="#fff"/>
+          <circle cx="44" cy="42" r="14" fill="#fff" stroke="#fff" stroke-width="2"/>
+          <circle cx="44" cy="42" r="8" fill="#ddd" stroke="#aaa" stroke-width="2"/>
+          <circle cx="44" cy="42" r="3" fill="#fff"/>
+
+          <!-- P -->
+          <text x="2"  y="68" font-family="Impact,Arial Black,sans-serif" font-size="72" font-weight="900"
+            fill="#1a4aaa" stroke="#ffffff" stroke-width="6" paint-order="stroke">P</text>
+
+          <!-- OKE (espace pour la pokéball) -->
+          <text x="82"  y="68" font-family="Impact,Arial Black,sans-serif" font-size="72" font-weight="900"
+            fill="#1a4aaa" stroke="#ffffff" stroke-width="6" paint-order="stroke">KE</text>
+
+          <!-- GRAPH -->
+          <text x="170" y="68" font-family="Impact,Arial Black,sans-serif" font-size="72" font-weight="900"
+            fill="#1a4aaa" stroke="#ffffff" stroke-width="6" paint-order="stroke">GRAPH</text>
+
+          <!-- Évoli simplifié (silhouette à droite) -->
+          <ellipse cx="378" cy="48" rx="14" ry="12" fill="rgba(255,200,100,.7)"/>
+          <ellipse cx="378" cy="36" rx="9"  ry="8"  fill="rgba(255,200,100,.7)"/>
+          <ellipse cx="372" cy="28" rx="4"  ry="6"  fill="rgba(255,200,100,.7)"/>
+          <ellipse cx="384" cy="28" rx="4"  ry="6"  fill="rgba(255,200,100,.7)"/>
+          <circle  cx="375" cy="35" r="2"   fill="rgba(50,30,10,.6)"/>
+          <circle  cx="381" cy="35" r="2"   fill="rgba(50,30,10,.6)"/>
+          <!-- Éclairs dorés -->
+          <path d="M390 28 L386 36 L389 36 L385 44" stroke="#e8c020" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M394 32 L391 38 L393 38 L390 44" stroke="#e8c020" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <div class="pg-tagline">BLINDTEST · 30 ANS</div>
+      </div>
+    </div>
+
+    <div class="ab-wrap">
+      <div class="btn-b" id="hw-btn-b" onclick="gbBtnB()">B</div>
+      <div class="btn-a" id="hw-btn-a" onclick="gbBtnA()">A</div>
+    </div>
+  </div>
+</div>
+
+<!-- External panels (animateur only) -->
+<div class="ext-wrap">
+  <div class="ext-panel">
+    <div class="ext-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>📀 LISTE OSTs</span>
+      <button onclick="gbToggleOst()" id="ost-toggle-btn" class="host-only"
+        style="background:var(--gb0);color:var(--gb4);border:1px solid rgba(45,90,39,.5);font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 6px;cursor:pointer;border-radius:2px;">
+        🔒 VOIR
+      </button>
+    </div>
+    <div id="ost-panel-locked" style="font-size:5px;color:rgba(139,188,15,.3);text-align:center;padding:12px 0;line-height:2;">
+      🔒 MASQUÉ<br><span style="font-size:8px">Connectez-vous en animateur pour voir</span>
+    </div>
+    <div class="ost-grid" id="ost-grid" style="display:none;"></div>
+  </div>
+  <div class="ext-panel">
+    <div class="ext-title">📖 LÉGENDE EVENTS</div>
+    <div class="legend-grid">
+      <div class="legend-row"><span>⭐</span><span>DOUBLE — ×2 pts ce round</span></div>
+      <div class="legend-row"><span>⚡</span><span>SPEED — +50 pts au 1er correct</span></div>
+      <div class="legend-row"><span>🎭</span><span>VOLEUR — vole 20 pts au leader</span></div>
+      <div class="legend-row"><span>💎</span><span>BONUS +100 à tous les corrects</span></div>
+      <div class="legend-row"><span>🚫</span><span>PIÈGE — 0 pts ce round</span></div>
+      <div class="legend-row"><span>🌟</span><span>LÉGENDAIRE — ×3 pts !</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="host-badge" id="host-badge">
+  <div class="host-badge-dot"></div>
+  ANIMATEUR CONNECTÉ
+</div>
+
+<div class="notif" id="notif"></div>
+
+<!-- Reset confirm dialog -->
+<div class="reset-dialog" id="reset-dialog">
+  <div class="reset-card">
+    <div class="reset-title">⚠️ RESET COMPLET ?</div>
+    <div class="reset-sub">
+      Ceci va effacer :<br>
+      tous les joueurs · tous les scores · toute la partie<br><br>
+      <span style="color:var(--red)">Cette action est irréversible !</span>
+    </div>
+    <div class="reset-btns">
+      <button class="r-btn" onclick="doFullReset()">🗑️ CONFIRMER</button>
+      <button class="r-btn-cancel" onclick="document.getElementById('reset-dialog').classList.remove('show')">ANNULER</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  function confirmFullReset(){
+    document.getElementById('reset-dialog').classList.add('show');
+  }
+  async function doFullReset(){
+    document.getElementById('reset-dialog').classList.remove('show');
+    await window._fb.hostFullReset();
+  }
+  window.confirmFullReset = confirmFullReset;
+  window.doFullReset = doFullReset;
+</script>
+
+<!-- Check Firebase config -->
+<script type="module">
+  setTimeout(()=>{
+    const scripts = document.querySelectorAll('script[type="module"]');
+    for(const s of scripts){
+      if(s.textContent.includes('REMPLACE_PAR_TA_CLE')){
+        document.getElementById('config-warn').classList.add('show');
+        break;
+      }
+    }
+  },500);
+</script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update, remove, push }
@@ -17,18 +1010,24 @@ import { getDatabase, ref, set, get, onValue, update, remove, push }
 
 // ↓↓↓ COLLE TA CONFIG FIREBASE ICI ↓↓↓
 const firebaseConfig = {
-  apiKey:            "AIzaSyCTJs7ZI0fDIToaoiTGd57bYqHYgsRgAAU",
-  authDomain:        "blindest-30-ans.firebaseapp.com",
-  databaseURL:       "https://blindest-30-ans-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId:         "blindest-30-ans",
-  storageBucket:     "blindest-30-ans.firebasestorage.app",
-  messagingSenderId: "254739323206",
-  appId:             "1:254739323206:web:412541f301048ee0bf2d47",
+  apiKey:            "REMPLACE_PAR_TA_CLE",
+  authDomain:        "REMPLACE.firebaseapp.com",
+  databaseURL:       "https://REMPLACE-default-rtdb.firebaseio.com",
+  projectId:         "REMPLACE",
+  storageBucket:     "REMPLACE.appspot.com",
+  messagingSenderId: "REMPLACE",
+  appId:             "REMPLACE"
 };
 // ↑↑↑ FIN CONFIG ↑↑↑
 
-const app = initializeApp(firebaseConfig);
-const db  = getDatabase(app);
+// Firebase init protégé — le reste du jeu fonctionne même sans config
+let db = null;
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+} catch(e) {
+  console.warn('Firebase non configuré — mode hors-ligne');
+}
 
 // ═══════════════════════════════════════════════
 //  CONSTANTES
@@ -40,36 +1039,36 @@ const ROOM_ID = 'blindtest-30ans'; // identifiant de la salle
 //  OST DATA
 // ═══════════════════════════════════════════════
 const OSTS = [
-  {id:1,  name:"Pallet Town Theme",      game:"Pokémon Rouge/Bleu",        year:1996, cat:"ville"},
-  {id:2,  name:"Battle! Dresseur",       game:"Pokémon Rouge/Bleu",        year:1996, cat:"combat"},
-  {id:3,  name:"Lavanville",             game:"Pokémon Rouge/Bleu",        year:1996, cat:"ville"},
-  {id:4,  name:"Arène Pokémon",          game:"Pokémon Rouge/Bleu",        year:1996, cat:"arène"},
-  {id:5,  name:"Centre Pokémon",         game:"Pokémon Jaune",             year:1998, cat:"lieu"},
-  {id:6,  name:"Ecruteak City",          game:"Pokémon Or/Argent",         year:1999, cat:"ville"},
-  {id:7,  name:"Battle! Ho-Oh",          game:"Pokémon Or/Argent",         year:1999, cat:"combat"},
-  {id:8,  name:"Parc National",          game:"Pokémon Or/Argent",         year:1999, cat:"lieu"},
-  {id:9,  name:"Frontier Battle",        game:"Pokémon Émeraude",          year:2004, cat:"combat"},
-  {id:10, name:"Littleroot Town",        game:"Pokémon Rubis/Saphir",      year:2002, cat:"ville"},
-  {id:11, name:"Ever Grande City",       game:"Pokémon Rubis/Saphir",      year:2002, cat:"ville"},
-  {id:12, name:"Pokémon Theme (Animé)",  game:"Animé Saison 1",            year:1997, cat:"animé"},
-  {id:13, name:"Battle! Rival",          game:"Pokémon Diamant/Perle",     year:2006, cat:"combat"},
-  {id:14, name:"Eterna City",            game:"Pokémon Diamant/Perle",     year:2006, cat:"ville"},
-  {id:15, name:"Battle! Cynthia",        game:"Pokémon Diamant/Perle",     year:2006, cat:"combat"},
-  {id:16, name:"Lacunosa Town",          game:"Pokémon Noir/Blanc",        year:2010, cat:"ville"},
-  {id:17, name:"N's Farewell",           game:"Pokémon Noir/Blanc",        year:2010, cat:"cinématique"},
-  {id:18, name:"Battle! Champion",       game:"Pokémon Noir/Blanc",        year:2010, cat:"combat"},
-  {id:19, name:"Lumiose City",           game:"Pokémon X/Y",               year:2013, cat:"ville"},
-  {id:20, name:"Battle! Lysandre",       game:"Pokémon X/Y",               year:2013, cat:"combat"},
-  {id:21, name:"Iki Town",               game:"Pokémon Soleil/Lune",       year:2016, cat:"ville"},
-  {id:22, name:"Battle! Gladion",        game:"Pokémon Soleil/Lune",       year:2016, cat:"combat"},
-  {id:23, name:"Ultra Mégalopole",       game:"Pokémon Ultra S/L",         year:2017, cat:"lieu"},
-  {id:24, name:"Zone Sauvage",           game:"Pokémon Épée/Bouclier",     year:2019, cat:"lieu"},
-  {id:25, name:"Battle! Leon",           game:"Pokémon Épée/Bouclier",     year:2019, cat:"combat"},
-  {id:26, name:"Battle! Arceus",         game:"Légendes Pokémon: Arceus",  year:2022, cat:"combat"},
-  {id:27, name:"Village Ruche",          game:"Légendes Pokémon: Arceus",  year:2022, cat:"ville"},
-  {id:28, name:"Mesagoza",               game:"Pokémon Écarlate/Violet",   year:2022, cat:"ville"},
-  {id:29, name:"Zone Zéro",             game:"Pokémon Écarlate/Violet",   year:2022, cat:"lieu"},
-  {id:30, name:"Gotta Catch 'Em All",   game:"Animé / Franchise",         year:1997, cat:"animé"},
+  {id:1,  name:"Pallet Town Theme",      game:"Pokémon Rouge/Bleu",        year:1996, cat:"ville",        gen:1},
+  {id:2,  name:"Battle! Dresseur",       game:"Pokémon Rouge/Bleu",        year:1996, cat:"combat",       gen:1},
+  {id:3,  name:"Lavanville",             game:"Pokémon Rouge/Bleu",        year:1996, cat:"ville",        gen:1},
+  {id:4,  name:"Arène Pokémon",          game:"Pokémon Rouge/Bleu",        year:1996, cat:"arène",        gen:1},
+  {id:5,  name:"Centre Pokémon",         game:"Pokémon Jaune",             year:1998, cat:"lieu",         gen:1},
+  {id:6,  name:"Ecruteak City",          game:"Pokémon Or/Argent",         year:1999, cat:"ville",        gen:2},
+  {id:7,  name:"Battle! Ho-Oh",          game:"Pokémon Or/Argent",         year:1999, cat:"combat",       gen:2},
+  {id:8,  name:"Parc National",          game:"Pokémon Or/Argent",         year:1999, cat:"lieu",         gen:2},
+  {id:9,  name:"Frontier Battle",        game:"Pokémon Émeraude",          year:2004, cat:"combat",       gen:3},
+  {id:10, name:"Littleroot Town",        game:"Pokémon Rubis/Saphir",      year:2002, cat:"ville",        gen:3},
+  {id:11, name:"Ever Grande City",       game:"Pokémon Rubis/Saphir",      year:2002, cat:"ville",        gen:3},
+  {id:12, name:"Pokémon Theme (Animé)",  game:"Animé Saison 1",            year:1997, cat:"animé",        gen:1},
+  {id:13, name:"Battle! Rival",          game:"Pokémon Diamant/Perle",     year:2006, cat:"combat",       gen:4},
+  {id:14, name:"Eterna City",            game:"Pokémon Diamant/Perle",     year:2006, cat:"ville",        gen:4},
+  {id:15, name:"Battle! Cynthia",        game:"Pokémon Diamant/Perle",     year:2006, cat:"combat",       gen:4},
+  {id:16, name:"Lacunosa Town",          game:"Pokémon Noir/Blanc",        year:2010, cat:"ville",        gen:5},
+  {id:17, name:"N's Farewell",           game:"Pokémon Noir/Blanc",        year:2010, cat:"cinématique",  gen:5},
+  {id:18, name:"Battle! Champion",       game:"Pokémon Noir/Blanc",        year:2010, cat:"combat",       gen:5},
+  {id:19, name:"Lumiose City",           game:"Pokémon X/Y",               year:2013, cat:"ville",        gen:6},
+  {id:20, name:"Battle! Lysandre",       game:"Pokémon X/Y",               year:2013, cat:"combat",       gen:6},
+  {id:21, name:"Iki Town",               game:"Pokémon Soleil/Lune",       year:2016, cat:"ville",        gen:7},
+  {id:22, name:"Battle! Gladion",        game:"Pokémon Soleil/Lune",       year:2016, cat:"combat",       gen:7},
+  {id:23, name:"Ultra Mégalopole",       game:"Pokémon Ultra S/L",         year:2017, cat:"lieu",         gen:7},
+  {id:24, name:"Zone Sauvage",           game:"Pokémon Épée/Bouclier",     year:2019, cat:"lieu",         gen:8},
+  {id:25, name:"Battle! Leon",           game:"Pokémon Épée/Bouclier",     year:2019, cat:"combat",       gen:8},
+  {id:26, name:"Battle! Arceus",         game:"Légendes Pokémon: Arceus",  year:2022, cat:"combat",       gen:8},
+  {id:27, name:"Village Ruche",          game:"Légendes Pokémon: Arceus",  year:2022, cat:"ville",        gen:8},
+  {id:28, name:"Mesagoza",               game:"Pokémon Écarlate/Violet",   year:2022, cat:"ville",        gen:9},
+  {id:29, name:"Zone Zéro",             game:"Pokémon Écarlate/Violet",   year:2022, cat:"lieu",         gen:9},
+  {id:30, name:"Gotta Catch 'Em All",   game:"Animé / Franchise",         year:1997, cat:"animé",        gen:1},
 ];
 
 const EVENTS = [
@@ -82,39 +1081,251 @@ const EVENTS = [
 ];
 
 const POKEMON_SVGS = [
-  `<circle cx="40" cy="40" r="30" fill="#2d5a27"/><rect x="10" y="37" width="60" height="6" fill="#0f1a0f"/><circle cx="40" cy="40" r="10" fill="#0f1a0f" stroke="#2d5a27" stroke-width="2"/><rect x="27" y="25" width="6" height="6" fill="#8bbc0f"/><rect x="47" y="25" width="6" height="6" fill="#8bbc0f"/>`,
-  `<ellipse cx="40" cy="45" rx="28" ry="20" fill="#1a3320"/><rect x="20" y="28" width="40" height="22" rx="8" fill="#2d5a27"/><rect x="22" y="22" width="16" height="14" rx="4" fill="#2d5a27"/><rect x="27" y="26" width="4" height="4" fill="#0f1a0f"/><rect x="33" y="26" width="4" height="4" fill="#0f1a0f"/>`,
-  `<ellipse cx="40" cy="44" rx="16" ry="12" fill="#1a3320"/><rect x="24" y="28" width="32" height="22" rx="10" fill="#2d5a27"/><rect x="30" y="20" width="20" height="16" rx="6" fill="#2d5a27"/><rect x="28" y="14" width="8" height="14" rx="3" fill="#1a3320"/><rect x="44" y="14" width="8" height="14" rx="3" fill="#1a3320"/><rect x="33" y="25" width="4" height="4" fill="#0f1a0f"/><rect x="43" y="25" width="4" height="4" fill="#0f1a0f"/><rect x="36" y="54" width="8" height="18" rx="4" fill="#2d5a27"/>`,
-  `<ellipse cx="40" cy="38" rx="18" ry="22" fill="#2d5a27"/><ellipse cx="40" cy="22" rx="12" ry="14" fill="#2d5a27"/><rect x="34" y="19" width="4" height="4" fill="#0f1a0f"/><rect x="42" y="19" width="4" height="4" fill="#0f1a0f"/><rect x="34" y="25" width="12" height="5" rx="2" fill="#1a3320"/><ellipse cx="20" cy="36" rx="14" ry="6" fill="#2d5a27"/><ellipse cx="60" cy="36" rx="14" ry="6" fill="#2d5a27"/>`,
-  `<ellipse cx="40" cy="34" rx="22" ry="26" fill="#1a3320"/><rect x="18" y="56" width="10" height="10" rx="2" fill="#1a3320"/><rect x="36" y="58" width="8" height="8" rx="2" fill="#1a3320"/><rect x="52" y="56" width="10" height="10" rx="2" fill="#1a3320"/><rect x="30" y="28" width="6" height="6" fill="#8bbc0f"/><rect x="44" y="28" width="6" height="6" fill="#8bbc0f"/><rect x="34" y="38" width="12" height="5" rx="2" fill="#0f1a0f"/>`,
-  `<ellipse cx="40" cy="42" rx="20" ry="18" fill="#2d5a27"/><rect x="28" y="22" width="24" height="26" rx="8" fill="#2d5a27"/><rect x="26" y="16" width="12" height="18" rx="5" fill="#1a3320"/><rect x="42" y="16" width="12" height="18" rx="5" fill="#1a3320"/><rect x="31" y="25" width="5" height="5" fill="#8bbc0f"/><rect x="44" y="25" width="5" height="5" fill="#8bbc0f"/>`,
-  `<ellipse cx="38" cy="40" rx="24" ry="16" fill="#2d5a27"/><ellipse cx="36" cy="40" rx="10" ry="8" fill="#1a3320"/><rect x="30" y="34" width="5" height="5" fill="#8bbc0f"/><ellipse cx="64" cy="40" rx="12" ry="8" fill="#2d5a27"/><ellipse cx="64" cy="34" rx="8" ry="5" fill="#1a3320"/><ellipse cx="64" cy="46" rx="8" ry="5" fill="#1a3320"/>`,
-  `<ellipse cx="40" cy="44" rx="28" ry="20" fill="#1a3320"/><ellipse cx="34" cy="30" rx="16" ry="18" fill="#2d5a27"/><ellipse cx="52" cy="28" rx="12" ry="16" fill="#2d5a27"/><rect x="29" y="26" width="5" height="5" fill="#0f1a0f"/><rect x="44" y="24" width="5" height="5" fill="#0f1a0f"/>`,
-  `<ellipse cx="40" cy="42" rx="16" ry="12" fill="#1a3320"/><rect x="24" y="26" width="32" height="22" rx="8" fill="#2d5a27"/><rect x="29" y="18" width="10" height="16" rx="5" fill="#2d5a27"/><rect x="41" y="18" width="10" height="16" rx="5" fill="#2d5a27"/><rect x="33" y="27" width="5" height="5" fill="#8bbc0f"/><rect x="42" y="27" width="5" height="5" fill="#8bbc0f"/>`,
-  `<ellipse cx="40" cy="38" rx="14" ry="18" fill="#2d5a27"/><ellipse cx="40" cy="24" rx="10" ry="12" fill="#2d5a27"/><rect x="35" y="20" width="4" height="4" fill="#0f1a0f"/><rect x="41" y="20" width="4" height="4" fill="#0f1a0f"/><ellipse cx="16" cy="32" rx="18" ry="8" fill="#1a3320"/><ellipse cx="64" cy="32" rx="18" ry="8" fill="#1a3320"/>`,
-  `<ellipse cx="40" cy="44" rx="22" ry="18" fill="#1a3320"/><rect x="22" y="26" width="36" height="26" rx="10" fill="#2d5a27"/><circle cx="32" cy="22" r="8" fill="#2d5a27"/><circle cx="48" cy="22" r="8" fill="#2d5a27"/><rect x="30" y="28" width="6" height="6" fill="#0f1a0f"/><rect x="44" y="28" width="6" height="6" fill="#0f1a0f"/>`,
-  `<ellipse cx="40" cy="28" rx="14" ry="16" fill="#2d5a27"/><rect x="26" y="36" width="10" height="36" rx="5" fill="#2d5a27"/><rect x="44" y="40" width="10" height="28" rx="5" fill="#1a3320"/><ellipse cx="40" cy="62" rx="16" ry="8" fill="#2d5a27"/>`,
-  `<rect x="22" y="14" width="36" height="28" rx="3" fill="#2d5a27"/><rect x="28" y="20" width="10" height="10" fill="#8bbc0f"/><rect x="42" y="20" width="10" height="10" fill="#8bbc0f"/><rect x="14" y="20" width="8" height="20" rx="3" fill="#1a3320"/><rect x="58" y="20" width="8" height="20" rx="3" fill="#1a3320"/><rect x="26" y="42" width="12" height="20" rx="3" fill="#1a3320"/><rect x="42" y="42" width="12" height="20" rx="3" fill="#1a3320"/>`,
-  `<ellipse cx="40" cy="32" rx="26" ry="22" fill="#2d5a27"/><rect x="22" y="52" width="4" height="18" rx="2" fill="#1a3320"/><rect x="30" y="54" width="4" height="14" rx="2" fill="#1a3320"/><rect x="46" y="54" width="4" height="14" rx="2" fill="#1a3320"/><rect x="54" y="52" width="4" height="18" rx="2" fill="#1a3320"/>`,
-  `<polygon points="40,6 54,30 54,52 40,66 26,52 26,30" fill="#2d5a27"/><polygon points="40,16 52,30 48,50 32,50 28,30" fill="#1a3320"/><rect x="36" y="28" width="8" height="8" fill="#0f1a0f"/>`,
-  `<ellipse cx="44" cy="42" rx="22" ry="16" fill="#2d5a27"/><rect x="26" y="24" width="24" height="24" rx="6" fill="#2d5a27"/><rect x="24" y="14" width="14" height="18" rx="4" fill="#1a3320"/><rect x="18" y="42" width="8" height="20" rx="3" fill="#1a3320"/><rect x="28" y="44" width="8" height="18" rx="3" fill="#1a3320"/><rect x="44" y="44" width="8" height="18" rx="3" fill="#1a3320"/><rect x="54" y="42" width="8" height="20" rx="3" fill="#1a3320"/>`,
-  `<ellipse cx="40" cy="42" rx="8" ry="18" fill="#1a3320"/><ellipse cx="20" cy="30" rx="18" ry="22" fill="#2d5a27"/><ellipse cx="60" cy="30" rx="18" ry="22" fill="#2d5a27"/><ellipse cx="22" cy="50" rx="12" ry="14" fill="#1a3320"/><ellipse cx="58" cy="50" rx="12" ry="14" fill="#1a3320"/>`,
-  `<ellipse cx="40" cy="42" rx="24" ry="16" fill="#2d5a27"/><ellipse cx="40" cy="38" rx="18" ry="14" fill="#1a3320"/><rect x="14" y="28" width="16" height="8" rx="3" fill="#2d5a27"/><rect x="50" y="28" width="16" height="8" rx="3" fill="#2d5a27"/>`,
-  `<ellipse cx="22" cy="44" rx="12" ry="12" fill="#2d5a27"/><ellipse cx="40" cy="40" rx="14" ry="14" fill="#2d5a27"/><ellipse cx="58" cy="44" rx="12" ry="12" fill="#2d5a27"/><rect x="32" y="24" width="16" height="14" rx="4" fill="#1a3320"/><rect x="34" y="27" width="5" height="5" fill="#8bbc0f"/><rect x="41" y="27" width="5" height="5" fill="#8bbc0f"/>`,
-  `<ellipse cx="40" cy="30" rx="30" ry="22" fill="#2d5a27"/><ellipse cx="24" cy="26" rx="8" ry="8" fill="#1a3320"/><ellipse cx="56" cy="24" rx="8" ry="8" fill="#1a3320"/><rect x="28" y="48" width="24" height="20" rx="4" fill="#1a3320"/>`,
-  `<rect x="20" y="30" width="16" height="30" rx="4" fill="#2d5a27"/><rect x="44" y="30" width="16" height="30" rx="4" fill="#2d5a27"/><rect x="20" y="14" width="16" height="18" rx="4" fill="#8bbc0f"/><rect x="44" y="14" width="16" height="18" rx="4" fill="#1a3320"/><rect x="36" y="26" width="8" height="12" rx="2" fill="#0f1a0f"/>`,
-  `<ellipse cx="40" cy="36" rx="28" ry="20" fill="#2d5a27"/><ellipse cx="26" cy="30" rx="14" ry="14" fill="#2d5a27"/><ellipse cx="54" cy="28" rx="14" ry="14" fill="#2d5a27"/>`,
-  `<ellipse cx="40" cy="38" rx="20" ry="16" fill="#1a3320"/><ellipse cx="40" cy="32" rx="14" ry="10" fill="#2d5a27"/><rect x="56" y="24" width="8" height="24" rx="4" fill="#2d5a27"/><rect x="58" y="16" width="8" height="10" rx="3" fill="#1a3320"/>`,
-  `<ellipse cx="40" cy="48" rx="28" ry="14" fill="#1a3320"/><rect x="22" y="28" width="36" height="28" rx="8" fill="#2d5a27"/><ellipse cx="40" cy="28" rx="20" ry="16" fill="#2d5a27"/><ellipse cx="40" cy="28" rx="12" ry="10" fill="#1a3320"/>`,
-  `<polygon points="48,8 36,38 46,38 32,72 58,34 46,34 60,8" fill="#2d5a27"/>`,
-  `<polygon points="40,8 58,28 52,56 28,56 22,28" fill="#2d5a27"/><polygon points="40,16 52,30 48,50 32,50 28,30" fill="#1a3320"/><polygon points="40,22 48,32 44,46 36,46 32,32" fill="#8bbc0f" opacity=".5"/>`,
-  `<circle cx="40" cy="30" r="20" fill="#2d5a27"/><circle cx="28" cy="24" r="8" fill="#2d5a27"/><circle cx="52" cy="24" r="8" fill="#2d5a27"/><rect x="36" y="50" width="8" height="22" rx="4" fill="#1a3320"/>`,
-  `<ellipse cx="38" cy="40" rx="30" ry="20" fill="#2d5a27"/><ellipse cx="68" cy="32" rx="8" ry="5" fill="#2d5a27"/><ellipse cx="68" cy="48" rx="8" ry="5" fill="#2d5a27"/>`,
-  `<rect x="18" y="20" width="44" height="42" rx="4" fill="#1a3320"/><rect x="22" y="24" width="36" height="34" rx="3" fill="#2d5a27"/><rect x="28" y="30" width="10" height="10" fill="#0f1a0f"/><rect x="42" y="30" width="10" height="10" fill="#0f1a0f"/>`,
+  // 0 Pokeball-shape / générique rond
+  `<ellipse cx="40" cy="42" rx="24" ry="22" fill="#2d5a27"/>
+   <ellipse cx="31" cy="24" rx="7" ry="9" fill="#2d5a27"/>
+   <ellipse cx="49" cy="24" rx="7" ry="9" fill="#2d5a27"/>
+   <ellipse cx="32" cy="22" rx="4" ry="6" fill="#1a3320"/>
+   <ellipse cx="48" cy="22" rx="4" ry="6" fill="#1a3320"/>
+   <circle  cx="33" cy="38" r="6" fill="#1a3320"/>
+   <circle  cx="47" cy="38" r="6" fill="#1a3320"/>
+   <ellipse cx="40" cy="30" rx="5" ry="4" fill="#8bbc0f"/>`,
+  // 1 Tortue carapace
+  `<ellipse cx="40" cy="40" rx="22" ry="20" fill="#2d5a27"/>
+   <ellipse cx="40" cy="40" rx="16" ry="14" fill="#1a3320"/>
+   <ellipse cx="40" cy="22" rx="12" ry="11" fill="#2d5a27"/>
+   <circle  cx="34" cy="20" r="3" fill="#1a3320"/>
+   <circle  cx="46" cy="20" r="3" fill="#1a3320"/>
+   <path d="M55 52 Q64 46 62 56 Q68 50 66 60" stroke="#2d5a27" stroke-width="4" fill="none" stroke-linecap="round"/>
+   <rect x="26" y="52" width="8" height="12" rx="4" fill="#2d5a27"/>
+   <rect x="46" y="52" width="8" height="12" rx="4" fill="#2d5a27"/>`,
+  // 2 Renard crinière
+  `<ellipse cx="38" cy="44" rx="16" ry="13" fill="#2d5a27"/>
+   <ellipse cx="38" cy="26" rx="12" ry="11" fill="#2d5a27"/>
+   <ellipse cx="30" cy="18" rx="5" ry="7" fill="#2d5a27"/>
+   <ellipse cx="46" cy="18" rx="5" ry="7" fill="#2d5a27"/>
+   <ellipse cx="38" cy="35" rx="14" ry="8" fill="#1a3320"/>
+   <circle  cx="33" cy="24" r="3" fill="#1a3320"/>
+   <circle  cx="43" cy="24" r="3" fill="#1a3320"/>
+   <ellipse cx="60" cy="50" rx="12" ry="9" fill="#1a3320"/>
+   <ellipse cx="62" cy="48" rx="9" ry="7" fill="#2d5a27"/>`,
+  // 3 Chat queue longue (Mew)
+  `<ellipse cx="36" cy="38" rx="18" ry="16" fill="#2d5a27"/>
+   <ellipse cx="36" cy="25" rx="10" ry="9" fill="#2d5a27"/>
+   <ellipse cx="28" cy="17" rx="5" ry="6" fill="#2d5a27"/>
+   <ellipse cx="44" cy="17" rx="5" ry="6" fill="#2d5a27"/>
+   <circle  cx="31" cy="24" r="2.5" fill="#1a3320"/>
+   <circle  cx="41" cy="24" r="2.5" fill="#1a3320"/>
+   <path d="M52 42 Q68 36 70 48 Q68 56 58 54" stroke="#2d5a27" stroke-width="5" fill="none" stroke-linecap="round"/>
+   <rect x="24" y="50" width="7" height="10" rx="3" fill="#2d5a27"/>
+   <rect x="39" y="50" width="7" height="10" rx="3" fill="#2d5a27"/>`,
+  // 4 Géant tête sphérique queue
+  `<ellipse cx="40" cy="50" rx="18" ry="22" fill="#1a3320"/>
+   <ellipse cx="40" cy="22" rx="14" ry="14" fill="#2d5a27"/>
+   <ellipse cx="31" cy="14" rx="5" ry="7" fill="#2d5a27"/>
+   <ellipse cx="49" cy="14" rx="5" ry="7" fill="#2d5a27"/>
+   <circle  cx="34" cy="20" r="3" fill="#8bbc0f"/>
+   <circle  cx="46" cy="20" r="3" fill="#8bbc0f"/>
+   <path d="M56 44 Q70 36 68 52" stroke="#2d5a27" stroke-width="6" fill="none" stroke-linecap="round"/>
+   <rect x="28" y="62" width="8" height="12" rx="3" fill="#1a3320"/>
+   <rect x="44" y="62" width="8" height="12" rx="3" fill="#1a3320"/>`,
+  // 5 Souris oreilles pointues queue éclair
+  `<ellipse cx="38" cy="40" rx="18" ry="16" fill="#2d5a27"/>
+   <ellipse cx="38" cy="25" rx="12" ry="11" fill="#2d5a27"/>
+   <rect    x="28" y="6"  width="7" height="20" rx="3" fill="#2d5a27"/>
+   <rect    x="43" y="6"  width="7" height="20" rx="3" fill="#2d5a27"/>
+   <rect    x="29" y="6"  width="5" height="16" rx="2" fill="#1a3320"/>
+   <circle  cx="32" cy="37" r="5" fill="#1a3320"/>
+   <circle  cx="44" cy="37" r="5" fill="#1a3320"/>
+   <circle  cx="33" cy="24" r="3" fill="#1a3320"/>
+   <circle  cx="43" cy="24" r="3" fill="#1a3320"/>
+   <path d="M54 48 L62 38 L56 38 L64 26" stroke="#8bbc0f" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+  // 6 Dragon ailes déployées
+  `<ellipse cx="38" cy="48" rx="16" ry="20" fill="#1a3320"/>
+   <ellipse cx="38" cy="28" rx="12" ry="12" fill="#2d5a27"/>
+   <ellipse cx="30" cy="17" rx="5" ry="7" fill="#2d5a27"/>
+   <ellipse cx="46" cy="17" rx="5" ry="7" fill="#2d5a27"/>
+   <path d="M22 40 Q4 22 8 46 Q12 58 24 54 Z"  fill="#1a3320"/>
+   <path d="M54 40 Q72 22 68 46 Q64 58 52 54 Z" fill="#1a3320"/>
+   <path d="M22 40 Q8 28 10 42 Z"  fill="#2d5a27"/>
+   <path d="M54 40 Q68 28 66 42 Z" fill="#2d5a27"/>
+   <path d="M44 66 Q50 72 46 78" stroke="#8bbc0f" stroke-width="5" fill="none" stroke-linecap="round"/>`,
+  // 7 Géant obèse petites pattes
+  `<ellipse cx="40" cy="48" rx="28" ry="26" fill="#1a3320"/>
+   <ellipse cx="40" cy="35" rx="18" ry="17" fill="#2d5a27"/>
+   <circle  cx="33" cy="32" r="4" fill="#1a3320"/>
+   <circle  cx="47" cy="32" r="4" fill="#1a3320"/>
+   <ellipse cx="40" cy="42" rx="12" ry="8" fill="#2d5a27" opacity=".6"/>
+   <rect x="20" y="64" width="12" height="8" rx="4" fill="#1a3320"/>
+   <rect x="48" y="64" width="12" height="8" rx="4" fill="#1a3320"/>`,
+  // 8 Fantôme souriant yeux expressifs
+  `<ellipse cx="40" cy="46" rx="22" ry="20" fill="#1a3320"/>
+   <ellipse cx="28" cy="38" rx="7" ry="8" fill="#2d5a27"/>
+   <ellipse cx="52" cy="38" rx="7" ry="8" fill="#2d5a27"/>
+   <ellipse cx="28" cy="36" rx="4" ry="5" fill="#8bbc0f"/>
+   <ellipse cx="52" cy="36" rx="4" ry="5" fill="#8bbc0f"/>
+   <path d="M28 54 Q34 62 40 54 Q46 62 52 54" stroke="#2d5a27" stroke-width="3" fill="none" stroke-linecap="round"/>
+   <ellipse cx="40" cy="30" rx="8" ry="4" fill="#1a3320"/>`,
+  // 9 Oiseau ailes crête
+  `<ellipse cx="40" cy="46" rx="18" ry="16" fill="#2d5a27"/>
+   <ellipse cx="40" cy="26" rx="10" ry="10" fill="#2d5a27"/>
+   <path d="M22 42 Q8 30 14 50 Q18 60 28 54 Z"  fill="#1a3320"/>
+   <path d="M58 42 Q72 30 66 50 Q62 60 52 54 Z" fill="#1a3320"/>
+   <rect x="36" y="14" width="8" height="12" rx="2" fill="#1a3320"/>
+   <circle cx="36" cy="23" r="3" fill="#8bbc0f"/>
+   <circle cx="44" cy="23" r="3" fill="#8bbc0f"/>
+   <path d="M36 32 Q40 36 44 32" stroke="#1a3320" stroke-width="2" fill="none"/>`,
+  // 10 Triple aimant
+  `<circle cx="24" cy="30" r="10" fill="#2d5a27"/>
+   <circle cx="56" cy="30" r="10" fill="#2d5a27"/>
+   <circle cx="40" cy="52" r="10" fill="#2d5a27"/>
+   <circle cx="24" cy="30" r="5"  fill="#1a3320"/>
+   <circle cx="56" cy="30" r="5"  fill="#1a3320"/>
+   <circle cx="40" cy="52" r="5"  fill="#1a3320"/>
+   <circle cx="22" cy="28" r="2" fill="#8bbc0f"/>
+   <circle cx="54" cy="28" r="2" fill="#8bbc0f"/>
+   <circle cx="38" cy="50" r="2" fill="#8bbc0f"/>`,
+  // 11 Renard queue large
+  `<ellipse cx="34" cy="40" rx="20" ry="16" fill="#2d5a27"/>
+   <ellipse cx="34" cy="26" rx="13" ry="12" fill="#2d5a27"/>
+   <ellipse cx="26" cy="16" rx="6" ry="8"  fill="#1a3320"/>
+   <ellipse cx="42" cy="16" rx="6" ry="8"  fill="#1a3320"/>
+   <circle  cx="29" cy="24" r="3.5" fill="#1a3320"/>
+   <circle  cx="39" cy="24" r="3.5" fill="#1a3320"/>
+   <path d="M52 42 Q68 34 70 50 Q68 62 56 58 Z" fill="#1a3320"/>`,
+  // 12 Dragon ailé grand
+  `<ellipse cx="38" cy="50" rx="20" ry="24" fill="#1a3320"/>
+   <ellipse cx="38" cy="26" rx="14" ry="13" fill="#2d5a27"/>
+   <ellipse cx="28" cy="16" rx="6" ry="8" fill="#2d5a27"/>
+   <ellipse cx="48" cy="16" rx="6" ry="8" fill="#2d5a27"/>
+   <path d="M18 44 Q2 28 6 48 Q10 64 20 56 Z"  fill="#2d5a27"/>
+   <path d="M58 44 Q74 28 70 48 Q66 64 56 56 Z" fill="#2d5a27"/>
+   <circle cx="32" cy="24" r="4" fill="#8bbc0f"/>
+   <circle cx="44" cy="24" r="4" fill="#8bbc0f"/>
+   <path d="M44 68 Q52 72 50 78" stroke="#8bbc0f" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+  // 13 Blob informe souriant
+  `<ellipse cx="40" cy="44" rx="26" ry="22" fill="#2d5a27"/>
+   <circle  cx="32" cy="40" r="5" fill="#1a3320"/>
+   <circle  cx="48" cy="40" r="5" fill="#1a3320"/>
+   <circle  cx="33" cy="39" r="2" fill="#8bbc0f"/>
+   <circle  cx="49" cy="39" r="2" fill="#8bbc0f"/>
+   <path d="M32 50 Q40 56 48 50" stroke="#1a3320" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+  // 14 Colosse crête bras épais
+  `<ellipse cx="40" cy="52" rx="22" ry="22" fill="#1a3320"/>
+   <ellipse cx="40" cy="28" rx="16" ry="14" fill="#2d5a27"/>
+   <rect    x="34" y="10" width="12" height="16" rx="3" fill="#2d5a27"/>
+   <rect    x="36" y="8"  width="8"  height="8"  rx="2" fill="#1a3320"/>
+   <rect    x="10" y="36" width="14" height="20" rx="6" fill="#1a3320"/>
+   <rect    x="56" y="36" width="14" height="20" rx="6" fill="#1a3320"/>
+   <circle  cx="34" cy="25" r="4" fill="#8bbc0f"/>
+   <circle  cx="46" cy="25" r="4" fill="#8bbc0f"/>`,
 ];
 
-const TRAINER_M = `<rect x="13" y="22" width="14" height="18" fill="#2d5a27"/><rect x="14" y="10" width="12" height="11" fill="#d4a060"/><rect x="12" y="8" width="16" height="5" fill="#1a3320"/><rect x="11" y="10" width="5" height="3" fill="#1a3320"/><rect x="16" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="22" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="7" y="22" width="6" height="3" fill="#2d5a27"/><rect x="27" y="22" width="6" height="3" fill="#2d5a27"/><rect x="5" y="25" width="4" height="4" fill="#d4a060"/><rect x="31" y="25" width="4" height="4" fill="#d4a060"/><rect x="13" y="40" width="6" height="12" fill="#1a3320"/><rect x="21" y="40" width="6" height="12" fill="#1a3320"/><rect x="12" y="50" width="8" height="4" fill="#0a0f0a"/><rect x="20" y="50" width="8" height="4" fill="#0a0f0a"/><rect x="27" y="24" width="3" height="14" fill="#8bbc0f"/><rect x="27" y="32" width="6" height="6" fill="#5a8c3a"/>`;
-const TRAINER_F = `<rect x="12" y="24" width="16" height="14" rx="5" fill="#b84090"/><ellipse cx="20" cy="34" rx="12" ry="6" fill="#d060a8"/><rect x="14" y="10" width="12" height="11" fill="#f4c080"/><rect x="12" y="6" width="16" height="6" fill="#c84888"/><rect x="10" y="6" width="4" height="8" rx="2" fill="#e06090"/><rect x="26" y="6" width="4" height="8" rx="2" fill="#e06090"/><rect x="16" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="22" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="8" y="24" width="4" height="3" fill="#b84090"/><rect x="28" y="24" width="4" height="3" fill="#b84090"/><rect x="6" y="27" width="3" height="4" fill="#f4c080"/><rect x="31" y="27" width="3" height="4" fill="#f4c080"/><rect x="15" y="38" width="5" height="14" rx="2" fill="#c84888"/><rect x="21" y="38" width="5" height="14" rx="2" fill="#c84888"/><rect x="14" y="50" width="7" height="4" fill="#0a0f0a"/><rect x="20" y="50" width="7" height="4" fill="#0a0f0a"/><rect x="5" y="28" width="5" height="8" rx="1" fill="#e88030"/>`;
+// ── TRAINER M : Sacha-style, casquette rouge, sourire enthousiaste ──────────
+const TRAINER_M = `
+  <!-- Corps / veste bleue -->
+  <rect x="12" y="28" width="16" height="20" rx="3" fill="#2255cc"/>
+  <rect x="14" y="28" width="12" height="8" fill="#3366ee"/>
+  <!-- Col blanc -->
+  <rect x="17" y="28" width="6" height="5" rx="1" fill="#ffffff"/>
+  <!-- Bras gauche -->
+  <rect x="6"  y="28" width="6"  height="14" rx="3" fill="#2255cc"/>
+  <rect x="4"  y="40" width="8"  height="7"  rx="3" fill="#e8b878"/>
+  <!-- Bras droit (levé, pokéball) -->
+  <rect x="28" y="22" width="6"  height="14" rx="3" fill="#2255cc"/>
+  <rect x="27" y="19" width="8"  height="7"  rx="3" fill="#e8b878"/>
+  <!-- Pokéball dans la main -->
+  <circle cx="33" cy="14" r="5" fill="#cc2200"/>
+  <rect   x="28" y="12" width="10" height="2" fill="#111"/>
+  <circle cx="33" cy="14" r="2"  fill="#fff" stroke="#111" stroke-width="1"/>
+  <!-- Jambes -->
+  <rect x="13" y="48" width="6" height="16" rx="2" fill="#333355"/>
+  <rect x="21" y="48" width="6" height="16" rx="2" fill="#333355"/>
+  <!-- Chaussures -->
+  <rect x="11" y="62" width="9"  height="5" rx="2" fill="#111"/>
+  <rect x="20" y="62" width="9"  height="5" rx="2" fill="#111"/>
+  <!-- Cou -->
+  <rect x="17" y="20" width="6" height="8" rx="2" fill="#e8b878"/>
+  <!-- Tête -->
+  <ellipse cx="20" cy="13" rx="9" ry="9" fill="#e8b878"/>
+  <!-- Oreilles -->
+  <ellipse cx="11" cy="13" rx="3" ry="3" fill="#e8b878"/>
+  <ellipse cx="29" cy="13" rx="3" ry="3" fill="#e8b878"/>
+  <!-- Casquette rouge -->
+  <rect x="11" y="4"  width="18" height="7"  rx="3" fill="#cc2200"/>
+  <rect x="9"  y="9"  width="22" height="3"  rx="1" fill="#cc2200"/>
+  <rect x="9"  y="9"  width="4"  height="3"  rx="1" fill="#aa1100"/>
+  <rect x="8"  y="9"  width="6"  height="2"  rx="1" fill="#cc2200"/>
+  <!-- Yeux expressifs (enthousiasme) -->
+  <ellipse cx="16" cy="13" rx="2.5" ry="3" fill="#111"/>
+  <ellipse cx="24" cy="13" rx="2.5" ry="3" fill="#111"/>
+  <circle cx="17" cy="12" r="1" fill="#fff"/>
+  <circle cx="25" cy="12" r="1" fill="#fff"/>
+  <!-- Sourcils relevés -->
+  <rect x="14" y="9" width="5" height="1.5" rx="1" fill="#6a3a10" transform="rotate(-8 14 9)"/>
+  <rect x="22" y="9" width="5" height="1.5" rx="1" fill="#6a3a10" transform="rotate(8 22 9)"/>
+  <!-- Grand sourire -->
+  <path d="M14 17 Q20 22 26 17" stroke="#a0522d" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M15 18 Q20 22 25 18" stroke="#fff" stroke-width="2" fill="#c0604a" clip-path="url(#smileClip)"/>
+  <!-- Joues roses -->
+  <ellipse cx="13" cy="16" rx="3" ry="2" fill="#ff9090" opacity=".5"/>
+  <ellipse cx="27" cy="16" rx="3" ry="2" fill="#ff9090" opacity=".5"/>
+`;
+
+// ── TRAINER F : Mizuki-style, robe élégante, expression déterminée ───────────
+const TRAINER_F = `
+  <!-- Robe / corps -->
+  <rect x="11" y="28" width="18" height="22" rx="4" fill="#cc3399"/>
+  <ellipse cx="20" cy="50" rx="12" ry="5" fill="#dd44aa"/>
+  <!-- Plastron blanc -->
+  <rect x="16" y="28" width="8" height="10" rx="2" fill="#fff"/>
+  <!-- Nœud -->
+  <ellipse cx="20" cy="32" rx="4" ry="3" fill="#ff66bb"/>
+  <circle  cx="20" cy="32" r="1.5" fill="#cc3399"/>
+  <!-- Bras gauche -->
+  <rect x="5"  y="28" width="6"  height="13" rx="3" fill="#cc3399"/>
+  <rect x="4"  y="39" width="7"  height="7"  rx="3" fill="#f4c8a0"/>
+  <!-- Bras droit (main sur la hanche) -->
+  <rect x="29" y="30" width="6"  height="12" rx="3" fill="#cc3399"/>
+  <rect x="28" y="40" width="7"  height="7"  rx="3" fill="#f4c8a0"/>
+  <!-- Jambes -->
+  <rect x="13" y="50" width="5"  height="14" rx="2" fill="#cc3399"/>
+  <rect x="22" y="50" width="5"  height="14" rx="2" fill="#cc3399"/>
+  <!-- Chaussures avec talons -->
+  <rect x="11" y="62" width="8"  height="4"  rx="2" fill="#111"/>
+  <rect x="20" y="62" width="8"  height="4"  rx="2" fill="#111"/>
+  <rect x="13" y="65" width="3"  height="3"  rx="1" fill="#333"/>
+  <rect x="22" y="65" width="3"  height="3"  rx="1" fill="#333"/>
+  <!-- Cou -->
+  <rect x="17" y="20" width="6" height="8" rx="2" fill="#f4c8a0"/>
+  <!-- Tête -->
+  <ellipse cx="20" cy="13" rx="9" ry="9" fill="#f4c8a0"/>
+  <!-- Oreilles -->
+  <ellipse cx="11" cy="13" rx="3" ry="3" fill="#f4c8a0"/>
+  <ellipse cx="29" cy="13" rx="3" ry="3" fill="#f4c8a0"/>
+  <!-- Cheveux longs noirs -->
+  <ellipse cx="20" cy="7" rx="10" ry="5" fill="#1a0a00"/>
+  <rect x="10" y="5"  width="6" height="20" rx="3" fill="#1a0a00"/>
+  <rect x="24" y="5"  width="6" height="22" rx="3" fill="#1a0a00"/>
+  <rect x="11" y="3"  width="18" height="7" rx="4" fill="#1a0a00"/>
+  <!-- Chapeau blanc avec ruban rose -->
+  <ellipse cx="20" cy="6"  rx="11" ry="4" fill="#f0f0f0"/>
+  <rect    x="10" y="4"   width="20" height="3" rx="1" fill="#f0f0f0"/>
+  <rect    x="10" y="5.5" width="20" height="2" fill="#ff88cc"/>
+  <!-- Yeux expressifs (détermination — légèrement plissés) -->
+  <ellipse cx="16" cy="13" rx="2.5" ry="2" fill="#111"/>
+  <ellipse cx="24" cy="13" rx="2.5" ry="2" fill="#111"/>
+  <circle cx="17" cy="12" r=".8" fill="#fff"/>
+  <circle cx="25" cy="12" r=".8" fill="#fff"/>
+  <!-- Sourcils décidés -->
+  <rect x="13" y="10" width="6" height="1.5" rx="1" fill="#1a0a00" transform="rotate(-5 13 10)"/>
+  <rect x="21" y="10" width="6" height="1.5" rx="1" fill="#1a0a00" transform="rotate(5 21 10)"/>
+  <!-- Sourire confiant -->
+  <path d="M15 17 Q20 20 25 17" stroke="#c06050" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Joues -->
+  <ellipse cx="13" cy="15" rx="2.5" ry="1.8" fill="#ffaaaa" opacity=".5"/>
+  <ellipse cx="27" cy="15" rx="2.5" ry="1.8" fill="#ffaaaa" opacity=".5"/>
+`;
 
 const AVATARS = ['🧢','🎓','👒','⛑️','🪖','🎩','🕶️','🎭','🦊','🐉','⚡','🌟','🔥','🌊','🌿','💫','🎮','🏆','🦋','🌺'];
 
@@ -133,6 +1344,124 @@ let L = {
   answers: {},
   scores: {},
 };
+
+// ═══════════════════════════════════════════════
+//  INTRO MUSIC — gentle 8-bit melody on connect screen
+// ═══════════════════════════════════════════════
+let introMusicInterval = null;
+let introMusicPlaying  = false;
+
+// A cheerful 8-bit arpeggio / melody loop
+const INTRO_MELODY = [
+  // Bar 1 — uplifting Pallet Town-ish motif
+  [523,0.12],[659,0.12],[784,0.12],[1047,0.18],
+  [784,0.10],[659,0.10],[523,0.15],null,
+  // Bar 2
+  [440,0.12],[523,0.12],[659,0.12],[880,0.18],
+  [659,0.10],[523,0.10],[440,0.15],null,
+  // Bar 3
+  [392,0.10],[494,0.10],[587,0.10],[784,0.14],
+  [698,0.10],[587,0.10],[494,0.10],[392,0.15],
+  // Bar 4 — resolve
+  [349,0.10],[440,0.10],[523,0.10],[659,0.14],
+  [587,0.10],[523,0.10],[440,0.10],[349,0.20],
+  null,null,
+];
+
+function startIntroMusic(){
+  if(introMusicPlaying) return;
+  introMusicPlaying = true;
+  let idx = 0;
+
+  function playNext(){
+    if(!introMusicPlaying) return;
+    const note = INTRO_MELODY[idx % INTRO_MELODY.length];
+    idx++;
+    if(note){
+      try{
+        const ac = getAC();
+        const o  = ac.createOscillator();
+        const g  = ac.createGain();
+        const [freq, dur] = note;
+        o.type = 'square';
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.06, ac.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur * 0.9);
+        o.connect(g); g.connect(ac.destination);
+        o.start(); o.stop(ac.currentTime + dur);
+        introMusicInterval = setTimeout(playNext, dur * 1000 * 0.95);
+      } catch(e){ introMusicInterval = setTimeout(playNext, 120); }
+    } else {
+      introMusicInterval = setTimeout(playNext, 180); // rest
+    }
+  }
+  playNext();
+}
+
+function stopIntroMusic(){
+  introMusicPlaying = false;
+  if(introMusicInterval){ clearTimeout(introMusicInterval); introMusicInterval = null; }
+}
+
+// ═══════════════════════════════════════════════
+//  STARFIELD CANVAS
+// ═══════════════════════════════════════════════
+function initStarfield(){
+  const canvas = document.getElementById('star-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  let raf;
+
+  function resize(){
+    canvas.width  = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    stars = Array.from({length:55}, ()=>({
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
+      r: Math.random()*1.5+.5,
+      speed: Math.random()*.4+.1,
+      twinkle: Math.random()*Math.PI*2,
+    }));
+  }
+
+  function draw(){
+    if(!document.getElementById('pg-connect').classList.contains('active')){ cancelAnimationFrame(raf); return; }
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    stars.forEach(s=>{
+      s.twinkle += 0.04;
+      const alpha = 0.4 + Math.sin(s.twinkle)*0.4;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(184,216,96,${alpha})`;
+      ctx.fill();
+      s.y += s.speed;
+      if(s.y > canvas.height){ s.y = 0; s.x = Math.random()*canvas.width; }
+    });
+    raf = requestAnimationFrame(draw);
+  }
+
+  resize();
+  draw();
+  // Restart when connect page becomes active
+  const obs = new MutationObserver(()=>{
+    if(document.getElementById('pg-connect').classList.contains('active')){
+      cancelAnimationFrame(raf);
+      resize();
+      draw();
+    }
+  });
+  obs.observe(document.getElementById('pg-connect'),{attributes:true,attributeFilter:['class']});
+}
+
+// Start starfield + music after DOM ready
+setTimeout(()=>{
+  initStarfield();
+  // Music starts on first user interaction (autoplay policy)
+  const startMusic = ()=>{ startIntroMusic(); document.removeEventListener('click',startMusic); document.removeEventListener('keydown',startMusic); };
+  document.addEventListener('click', startMusic);
+  document.addEventListener('keydown', startMusic);
+}, 200);
 
 // ═══════════════════════════════════════════════
 //  WEB AUDIO
@@ -159,15 +1488,16 @@ function sfxJoin(){beep(660,.1,'square',.1);setTimeout(()=>beep(880,.15,'square'
 // ═══════════════════════════════════════════════
 //  FIREBASE HELPERS
 // ═══════════════════════════════════════════════
-const roomRef   = () => ref(db, `rooms/${ROOM_ID}`);
-const stateRef  = () => ref(db, `rooms/${ROOM_ID}/state`);
-const playersRef= () => ref(db, `rooms/${ROOM_ID}/players`);
-const scoresRef = () => ref(db, `rooms/${ROOM_ID}/scores`);
-const answersRef= () => ref(db, `rooms/${ROOM_ID}/answers`);
+const roomRef   = () => db ? ref(db, `rooms/${ROOM_ID}`) : null;
+const stateRef  = () => db ? ref(db, `rooms/${ROOM_ID}/state`) : null;
+const playersRef= () => db ? ref(db, `rooms/${ROOM_ID}/players`) : null;
+const scoresRef = () => db ? ref(db, `rooms/${ROOM_ID}/scores`) : null;
+const answersRef= () => db ? ref(db, `rooms/${ROOM_ID}/answers`) : null;
 
-async function fbSet(path, data){ await set(ref(db, `rooms/${ROOM_ID}/${path}`), data); }
-async function fbUpdate(path, data){ await update(ref(db, `rooms/${ROOM_ID}/${path}`), data); }
-async function fbGet(path){ const s = await get(ref(db,`rooms/${ROOM_ID}/${path}`)); return s.val(); }
+async function fbSet(path, data){ if(!db){console.warn('Firebase non dispo');return;} await set(ref(db, `rooms/${ROOM_ID}/${path}`), data); }
+async function fbUpdate(path, data){ if(!db){console.warn('Firebase non dispo');return;} await update(ref(db, `rooms/${ROOM_ID}/${path}`), data); }
+async function fbGet(path){ if(!db) return null; const s = await get(ref(db,`rooms/${ROOM_ID}/${path}`)); return s.val(); }
+function fbListen(path, cb){ if(!db){console.warn('Firebase non dispo');return;} onValue(ref(db,`rooms/${ROOM_ID}/${path}`), s=>cb(s.val())); }
 
 // ═══════════════════════════════════════════════
 //  FIREBASE LISTENERS
@@ -242,6 +1572,7 @@ function selectGender(g){
   L.gender = g;
   document.getElementById('gbtn-m').classList.toggle('active', g==='m');
   document.getElementById('gbtn-f').classList.toggle('active', g==='f');
+  try{ beep(g==='f' ? 880 : 660, .06, 'square', .05); }catch(e){}
 }
 
 async function joinGame(){
@@ -262,11 +1593,12 @@ async function joinGame(){
 
   // Register in Firebase
   await fbUpdate(`players/${name}`, {
-    name, avatar: L.myAvatar, gender: L.gender, online: true, joinedAt: Date.now()
+    name, avatar: L.myAvatar, gender: window.GB_GENDER||L.gender, online: true, joinedAt: Date.now()
   });
   await fbUpdate(`scores/${name}`, {name, avatar: L.myAvatar, pts: 0});
 
   sfxJoin();
+  stopIntroMusic();
   startListeners();
 
   // Check current game state
@@ -345,12 +1677,16 @@ function loadBattleScene(s){
   const ost = OSTS[s.ostOrder[s.ostIdx]];
   const svgIdx = s.ostOrder[s.ostIdx] % POKEMON_SVGS.length;
 
+  // Apply generation theme
+  applyGenTheme(ost.gen || 1);
+
   // Pokemon silhouette
   const wrap = document.getElementById('poke-wrap');
   wrap.innerHTML = `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">${POKEMON_SVGS[svgIdx]}</svg>`;
   wrap.className = 'poke-svg-wrap silhouette poke-idle';
 
   // Trainer
+  L.gender = window.GB_GENDER||L.gender;
   document.getElementById('trainer-svg').innerHTML = L.gender==='f' ? TRAINER_F : TRAINER_M;
 
   // HUD
@@ -439,13 +1775,14 @@ function buildAnswerOptions(correctOst, ostIdx){
 
   const grid = document.getElementById('ans-grid');
   grid.innerHTML='';
+  padCursor = -1; // reset curseur pad
   opts.forEach((opt,i)=>{
     const btn = document.createElement('button');
     btn.className='ans-opt';
     btn.dataset.letter=letters[i];
     btn.dataset.ostId=opt.id;
     btn.dataset.correct=opt.id===correctOst.id?'1':'0';
-    btn.innerHTML=`${letters[i]}. ${opt.name}<br><span style="font-size:4px;opacity:.6">${opt.game}</span>`;
+    btn.innerHTML=`${letters[i]}. ${opt.name}<br><span style="font-size:8px;opacity:.6">${opt.game}</span>`;
     btn.onclick=()=>playerAnswer(opt.id, correctOst.id, opt.name);
     grid.appendChild(btn);
   });
@@ -502,15 +1839,15 @@ function renderHostAnswers(){
   const ans = Object.values(L.answers||{});
   const total = Object.keys(L.players||{}).length;
   panel.innerHTML=`
-    <div style="font-size:5px;color:var(--gb3);margin-bottom:3px;">
+    <div style="font-size:9px;color:var(--gb3);margin-bottom:4px;">
       RÉPONSES: ${ans.length}/${total}
     </div>
     ${ans.map(a=>`
-      <div style="display:flex;gap:4px;align-items:center;font-size:5px;padding:2px 3px;background:${a.correct?'rgba(45,90,39,.3)':'rgba(204,34,0,.15)'};border-radius:1px;margin-bottom:1px;">
+      <div style="display:flex;gap:4px;align-items:center;font-size:9px;padding:4px 6px;background:${a.correct?'rgba(45,90,39,.3)':'rgba(204,34,0,.15)'};border-radius:1px;margin-bottom:1px;">
         <span>${a.avatar}</span>
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.name}</span>
         <span style="color:${a.correct?'var(--gb5)':'#ff6644'}">${a.correct?'✓':'✗'}</span>
-        <span style="color:var(--gb3);font-size:4px">${a.selectedName?.substring(0,12)??'—'}</span>
+        <span style="color:var(--gb3);font-size:8px">${a.selectedName?.substring(0,12)??'—'}</span>
       </div>
     `).join('')}
   `;
@@ -648,21 +1985,55 @@ function renderRevealScoreboard(){
 function showFinalPage(){
   sfxFinal(); shakeScreen();
   showPage('final');
+
+  // Apply a special golden "champion" theme for the finale
+  const root = document.documentElement;
+  root.style.setProperty('--gb0','#1a1000');
+  root.style.setProperty('--gb1','#2d1f00');
+  root.style.setProperty('--gb2','#5a3e00');
+  root.style.setProperty('--gb3','#8c6200');
+  root.style.setProperty('--gb4','#c89000');
+  root.style.setProperty('--gb5','#e8c040');
+  root.style.setProperty('--gb6','#f0d880');
+  root.style.setProperty('--gb7','#f8ecc0');
+
+  // Launch confetti!
+  setTimeout(()=>launchConfetti(), 300);
+  // Extra bursts at key moments
+  setTimeout(()=>launchConfetti(), 1800);
+  setTimeout(()=>launchConfetti(), 3600);
+
   const sorted = Object.values(L.scores).sort((a,b)=>b.pts-a.pts);
 
   const podium = document.getElementById('podium');
   podium.innerHTML='';
   const places=[
-    {p:sorted[1],cls:'pod-col pod-2',label:'2'},
-    {p:sorted[0],cls:'pod-col pod-1',label:'1'},
-    {p:sorted[2],cls:'pod-col pod-3',label:'3'},
+    {p:sorted[1], cls:'pod-col pod-2', label:'🥈', delay:600},
+    {p:sorted[0], cls:'pod-col pod-1', label:'🥇', delay:200},
+    {p:sorted[2], cls:'pod-col pod-3', label:'🥉', delay:1000},
   ];
+
+  // Animate each podium entry in sequence
   places.forEach(pl=>{
     if(!pl.p) return;
     const div=document.createElement('div');
     div.className=pl.cls;
-    div.innerHTML=`<div class="pod-sprite">${pl.p.avatar}</div><div class="pod-name">${pl.p.name}</div><div class="pod-pts">${pl.p.pts||0} pts</div><div class="pod-block">${pl.label}</div>`;
+    div.style.opacity='0';
+    div.style.transform='translateY(30px)';
+    div.style.transition=`opacity .5s ease, transform .5s cubic-bezier(.34,1.56,.64,1)`;
+    div.innerHTML=`
+      <div class="pod-sprite" style="font-size:22px;">${pl.p.avatar}</div>
+      <div class="pod-name">${pl.p.name}</div>
+      <div class="pod-pts">${pl.p.pts||0} pts</div>
+      <div class="pod-block">${pl.label}</div>
+    `;
     podium.appendChild(div);
+    setTimeout(()=>{
+      div.style.opacity='1';
+      div.style.transform='translateY(0)';
+      beep(523,.1,'square',.12);
+      beep(659,.1,'square',.12,.12);
+    }, pl.delay);
   });
 
   document.getElementById('full-sb').innerHTML=sorted.map((p,i)=>`
@@ -831,6 +2202,214 @@ function notify(msg){
 }
 
 // ═══════════════════════════════════════════════
+//  GENERATION THEMES
+// ═══════════════════════════════════════════════
+const GEN_THEMES = {
+  1: { // Rouge/Bleu — classique Game Boy vert
+    name:'GEN I · Kanto',
+    gb0:'#0f1a0f', gb1:'#1a3320', gb2:'#2d5a27', gb3:'#5a8c3a',
+    gb4:'#8bbc0f', gb5:'#b8d860', gb6:'#d4e8a0', gb7:'#e8f0c8',
+    sky1:'#5a8c3a', sky2:'#8bbc0f',
+    accent:'#8bbc0f',
+  },
+  2: { // Or/Argent — doré chaud
+    name:'GEN II · Johto',
+    gb0:'#1a1000', gb1:'#2d1f00', gb2:'#5a3e00', gb3:'#8c6200',
+    gb4:'#c89000', gb5:'#e8c040', gb6:'#f0d880', gb7:'#f8ecc0',
+    sky1:'#8c6200', sky2:'#c89000',
+    accent:'#e8c040',
+  },
+  3: { // Rubis/Saphir — rouge rubis
+    name:'GEN III · Hoenn',
+    gb0:'#1a0008', gb1:'#330010', gb2:'#660020', gb3:'#992244',
+    gb4:'#cc3355', gb5:'#e87088', gb6:'#f0a8b8', gb7:'#f8dce4',
+    sky1:'#660020', sky2:'#cc3355',
+    accent:'#e87088',
+  },
+  4: { // Diamant/Perle — bleu lilas
+    name:'GEN IV · Sinnoh',
+    gb0:'#080818', gb1:'#101030', gb2:'#202060', gb3:'#404098',
+    gb4:'#6060c8', gb5:'#9090e0', gb6:'#c0c0f0', gb7:'#e0e0f8',
+    sky1:'#202060', sky2:'#6060c8',
+    accent:'#9090e0',
+  },
+  5: { // Noir/Blanc — gris acier
+    name:'GEN V · Unys',
+    gb0:'#0a0a0a', gb1:'#1a1a1a', gb2:'#333333', gb3:'#666666',
+    gb4:'#999999', gb5:'#cccccc', gb6:'#e0e0e0', gb7:'#f0f0f0',
+    sky1:'#333333', sky2:'#888888',
+    accent:'#cccccc',
+  },
+  6: { // X/Y — violet Kalos
+    name:'GEN VI · Kalos',
+    gb0:'#100018', gb1:'#200030', gb2:'#400060', gb3:'#700090',
+    gb4:'#9800c8', gb5:'#c040e8', gb6:'#e090f8', gb7:'#f0d0fc',
+    sky1:'#400060', sky2:'#9800c8',
+    accent:'#c040e8',
+  },
+  7: { // Soleil/Lune — orange tropique
+    name:'GEN VII · Alola',
+    gb0:'#1a0800', gb1:'#301400', gb2:'#602800', gb3:'#904800',
+    gb4:'#c86800', gb5:'#e89030', gb6:'#f8c070', gb7:'#fce8c0',
+    sky1:'#602800', sky2:'#c86800',
+    accent:'#e89030',
+  },
+  8: { // Épée/Bouclier — cyan Galar
+    name:'GEN VIII · Galar',
+    gb0:'#001818', gb1:'#002828', gb2:'#004848', gb3:'#007070',
+    gb4:'#009898', gb5:'#40c8c8', gb6:'#90e8e8', gb7:'#d0f8f8',
+    sky1:'#004848', sky2:'#009898',
+    accent:'#40c8c8',
+  },
+  9: { // Écarlate/Violet — bordeaux Paldea
+    name:'GEN IX · Paldea',
+    gb0:'#180008', gb1:'#300010', gb2:'#580020', gb3:'#880060',
+    gb4:'#b80090', gb5:'#d840b8', gb6:'#f090d8', gb7:'#fcd0f0',
+    sky1:'#580020', sky2:'#b80090',
+    accent:'#d840b8',
+  },
+};
+
+let currentGen = 0; // 0 = no theme applied yet
+
+function applyGenTheme(gen){
+  if(gen === currentGen) return;
+  currentGen = gen;
+  const t = GEN_THEMES[gen] || GEN_THEMES[1];
+  const root = document.documentElement;
+
+  // Animate transition via CSS custom property
+  root.style.setProperty('--transition-active','1');
+  root.style.setProperty('--gb0', t.gb0);
+  root.style.setProperty('--gb1', t.gb1);
+  root.style.setProperty('--gb2', t.gb2);
+  root.style.setProperty('--gb3', t.gb3);
+  root.style.setProperty('--gb4', t.gb4);
+  root.style.setProperty('--gb5', t.gb5);
+  root.style.setProperty('--gb6', t.gb6);
+  root.style.setProperty('--gb7', t.gb7);
+
+  // Sky gradient
+  const sky = document.getElementById('b-sky');
+  if(sky) sky.style.background = `linear-gradient(to bottom, ${t.sky1} 0%, ${t.sky2} 100%)`;
+
+  // Gen badge flash
+  showGenBadge(t.name, t.accent);
+}
+
+function showGenBadge(name, color){
+  let badge = document.getElementById('gen-badge');
+  if(!badge){
+    badge = document.createElement('div');
+    badge.id = 'gen-badge';
+    badge.style.cssText = `position:absolute;top:14px;left:50%;transform:translateX(-50%);font-family:'Press Start 2P',monospace;font-size:5px;padding:3px 8px;border-radius:1px;z-index:50;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .3s;`;
+    document.getElementById('screen').appendChild(badge);
+  }
+  badge.textContent = '✦ ' + name + ' ✦';
+  badge.style.background = 'var(--gb0)';
+  badge.style.color = color;
+  badge.style.border = `1px solid ${color}`;
+  badge.style.opacity = '1';
+  setTimeout(()=>{ badge.style.opacity='0'; }, 2200);
+}
+
+// ═══════════════════════════════════════════════
+//  CONFETTI SYSTEM
+// ═══════════════════════════════════════════════
+let confettiInterval = null;
+
+function launchConfetti(){
+  stopConfetti();
+  const screen = document.getElementById('screen');
+  if(!screen) return;
+
+  // Multiple waves
+  let wave = 0;
+  const maxWaves = 12;
+
+  function spawnWave(){
+    if(wave >= maxWaves){ stopConfetti(); return; }
+    wave++;
+    const count = wave < 4 ? 14 : 8; // heavy start, lighter end
+    for(let i=0; i<count; i++){
+      spawnConfettiPiece(screen, wave);
+    }
+    // Firework bursts on first 3 waves
+    if(wave <= 3) spawnFirework(screen);
+  }
+
+  spawnWave();
+  confettiInterval = setInterval(spawnWave, 350);
+}
+
+function stopConfetti(){
+  if(confettiInterval){ clearInterval(confettiInterval); confettiInterval=null; }
+}
+
+function spawnConfettiPiece(screen, wave){
+  const el = document.createElement('div');
+  const colors = [
+    'var(--gb4)','var(--gb5)','var(--gb6)',
+    '#e8c020','#cc2200','#ffffff',
+    'var(--accent, #8bbc0f)',
+  ];
+  const shapes = ['2px','3px','4px'];
+  const size = shapes[Math.floor(Math.random()*3)];
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  const startX = 5 + Math.random()*90;
+  const tx = (Math.random()-0.5)*80;
+  const dur = 1.2 + Math.random()*1.2;
+  const delay = Math.random()*0.3;
+
+  el.style.cssText = `
+    position:absolute;
+    left:${startX}%;top:-4px;
+    width:${size};height:${size};
+    background:${color};
+    pointer-events:none;z-index:500;
+    animation:confettiFall ${dur}s ${delay}s ease-in forwards;
+    transform:translateX(0) rotate(0deg);
+    --tx:${tx}px;
+  `;
+  screen.appendChild(el);
+  setTimeout(()=>el.remove(), (dur+delay+0.1)*1000);
+}
+
+function spawnFirework(screen){
+  const cx = 20 + Math.random()*60;
+  const cy = 10 + Math.random()*40;
+  const colors = ['var(--gb4)','var(--gb5)','#e8c020','#cc2200','#ffffff','var(--gb6)'];
+  const count = 10 + Math.floor(Math.random()*8);
+
+  for(let i=0; i<count; i++){
+    const el = document.createElement('div');
+    const angle = (i/count)*360;
+    const dist = 15 + Math.random()*25;
+    const rad = angle * Math.PI/180;
+    const tx = Math.cos(rad)*dist;
+    const ty = Math.sin(rad)*dist;
+    const color = colors[Math.floor(Math.random()*colors.length)];
+    el.style.cssText = `
+      position:absolute;
+      left:${cx}%;top:${cy}%;
+      width:3px;height:3px;
+      background:${color};
+      pointer-events:none;z-index:501;
+      border-radius:50%;
+      transition:transform 0.5s ease-out, opacity 0.5s ease-out;
+    `;
+    screen.appendChild(el);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      el.style.transform = `translate(${tx}px, ${ty}px)`;
+      el.style.opacity = '0';
+    }));
+    setTimeout(()=>el.remove(), 600);
+  }
+  // Bip
+  beep(523 + Math.random()*400, .12, 'square', .1);
+}
+
+// ═══════════════════════════════════════════════
 //  PROFESSOR GRAPH SPEECH
 // ═══════════════════════════════════════════════
 const PROF_LINES = [
@@ -937,14 +2516,131 @@ function profAdvance(){
 }
 
 // ═══════════════════════════════════════════════
-//  KEYBOARD
+//  CONTRÔLES — PAD DIRECTIONNEL + BOUTONS A/B
 // ═══════════════════════════════════════════════
+
+// Index de la réponse survolée au pad (0-3, ou -1 = aucune)
+let padCursor = -1;
+
+// Mapping pad directionnel → index de réponse
+// Layout grille 2×2 : haut=0, bas=1, gauche=2, droite=3
+const PAD_MAP = { up:0, down:1, left:2, right:3 };
+
+// Champs focus sur l'écran de connexion : 0=pseudo, 1=motdepasse
+let connectFocus = 0;
+
+function setPadCursor(idx){
+  document.querySelectorAll('.ans-opt').forEach((b,i)=>{
+    b.classList.toggle('pad-cursor', i===idx);
+  });
+  padCursor = idx;
+  if(idx >= 0) beep(880, .06, 'square', .04); // petit bip navigation
+}
+
+function dpad(dir){
+  try{ startIntroMusic(); }catch(e){}
+
+  // Feedback visuel immédiat sur la flèche cliquée
+  const el = document.getElementById('dp-'+dir);
+  if(el){ el.style.background='linear-gradient(135deg,#bbddff,#4488cc)'; setTimeout(()=>el.style.background='',200); }
+
+  // ── CONNECT : ◀▶ = genre, ▲▼ = champ focus ──────────────
+  if(L.phase==='connect'){
+    if(dir==='left')  { selectGender('m'); return; }
+    if(dir==='right') { selectGender('f'); return; }
+    if(dir==='up'){
+      connectFocus = 0;
+      document.getElementById('join-name').focus();
+      try{ beep(660,.06,'square',.04); }catch(e){}
+      return;
+    }
+    if(dir==='down'){
+      connectFocus = 1;
+      document.getElementById('join-pass').focus();
+      try{ beep(660,.06,'square',.04); }catch(e){}
+      return;
+    }
+  }
+
+  // ── PROF : ▲▼ avancent le dialogue ───────────────────────
+  if(L.phase==='prof'){
+    if(dir==='down' || dir==='right') profAdvance();
+    return;
+  }
+
+  // ── BATTLE : naviguer entre les 4 réponses ───────────────
+  if(L.phase==='battle'){
+    const idx = PAD_MAP[dir];
+    if(idx !== undefined){
+      const opts = document.querySelectorAll('.ans-opt');
+      if(opts.length) setPadCursor(idx);
+    }
+    return;
+  }
+
+  // ── LOBBY / REVEAL / FINAL : ▲▼ scroll ───────────────────
+  if(L.phase==='lobby'||L.phase==='reveal'||L.phase==='final'){
+    const scrollEl = document.querySelector('.page.active');
+    if(scrollEl) scrollEl.scrollBy({top: dir==='up'?-40:40, behavior:'smooth'});
+    return;
+  }
+}
+
+function btnA(){
+  try{ startIntroMusic(); }catch(e){}
+  if(L.phase==='prof')    { profAdvance(); return; }
+  if(L.phase==='connect') { joinGame();    return; }
+  if(L.phase==='battle'){
+    if(padCursor < 0){ try{beep(220,.1,'square',.08);}catch(e){} return; }
+    const opts = document.querySelectorAll('.ans-opt');
+    const btn  = opts[padCursor];
+    if(btn && !btn.disabled){ btn.click(); padCursor = -1; }
+    return;
+  }
+}
+
+function btnB(){
+  if(L.phase==='battle'){
+    if(padCursor >= 0){ setPadCursor(-1); try{beep(330,.08,'square',.06);}catch(e){} }
+    return;
+  }
+  if(L.phase==='connect'){
+    if(connectFocus===1){
+      connectFocus=0;
+      document.getElementById('join-name').focus();
+      try{beep(440,.06,'square',.04);}catch(e){}
+    }
+    return;
+  }
+}
+
+// Reset curseur pad quand un nouveau round commence
+function resetPadCursor(){
+  padCursor = -1;
+  document.querySelectorAll('.ans-opt').forEach(b=>b.classList.remove('pad-cursor'));
+}
+
+// ── CLAVIER PHYSIQUE (mappé sur les contrôles) ────────────
 document.addEventListener('keydown', e=>{
-  if(e.key==='Enter' || e.key===' '){
-    if(L.phase==='connect') joinGame();
-    else if(L.phase==='prof') profAdvance();
+  // Empêche le scroll de page avec les flèches
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+
+  switch(e.key){
+    case 'ArrowUp':    dpad('up');    break;
+    case 'ArrowDown':  dpad('down');  break;
+    case 'ArrowLeft':  dpad('left');  break;
+    case 'ArrowRight': dpad('right'); break;
+    case 'Enter': case ' ':           btnA(); break;
+    case 'Backspace': case 'Escape':  btnB(); break;
   }
 });
+
+// Remise à zéro curseur pad à chaque nouveau round
+const _origBuildAnswerOptions = buildAnswerOptions;
+function buildAnswerOptions(correctOst, ostIdx){
+  _origBuildAnswerOptions(correctOst, ostIdx);
+  resetPadCursor();
+}
 
 // Click anywhere on screen to advance professor dialog
 document.getElementById('screen').addEventListener('click', ()=>{
@@ -952,676 +2648,25 @@ document.getElementById('screen').addEventListener('click', ()=>{
 });
 
 // Init
-window._fb = { startGame, hostReveal, hostNextTrack, hostSkip, hostResetGame, hostFullReset, joinGame, toggleOstPanel, selectGender, kickPlayer, buildExtOstList, profAdvance };
+// Expose toutes les fonctions directement sur window
+// (les onclick HTML inline ne peuvent pas accéder au scope d'un module ES)
+// Enregistrement via le système proxy (résout le timing ES module vs onclick HTML)
+window._registerFn('gbSelectGender', selectGender);
+window._registerFn('gbJoin',         joinGame);
+window._registerFn('gbStart',        startGame);
+window._registerFn('gbReveal',       hostReveal);
+window._registerFn('gbSkip',         hostSkip);
+window._registerFn('gbNext',         hostNextTrack);
+window._registerFn('gbReset',        hostResetGame);
+window._registerFn('gbToggleOst',    toggleOstPanel);
+window._registerFn('kickPlayer',     kickPlayer);
+window._registerFn('gbDpad',         dpad);
+window._registerFn('gbBtnA',         btnA);
+window._registerFn('gbBtnB',         btnB);
+window._fb = { hostFullReset };
+
+// ── Liaison boutons physiques de la coque ──────────────────
+// boutons liés via onclick html + _registerFn
 </script>
-
-<style>
-:root{
-  --gb0:#0f1a0f;--gb1:#1a3320;--gb2:#2d5a27;--gb3:#5a8c3a;
-  --gb4:#8bbc0f;--gb5:#b8d860;--gb6:#d4e8a0;--gb7:#e8f0c8;
-  --red:#cc2200;--gold:#e8c020;--screen-w:600px;
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{
-  background:#0a0f0a;min-height:100vh;
-  display:flex;flex-direction:column;align-items:center;
-  padding:30px 10px 60px;
-  font-family:'Press Start 2P',monospace;
-  overflow-x:hidden;
-}
-body::after{
-  content:'';position:fixed;inset:0;
-  background:repeating-linear-gradient(0deg,transparent 0px,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);
-  pointer-events:none;z-index:9999;
-}
-/* GAMEBOY SHELL */
-.gb-shell{
-  width:min(var(--screen-w),96vw);
-  background:linear-gradient(155deg,#d8d8c8 0%,#b8b8a8 50%,#a0a090 100%);
-  border-radius:10px 10px 36px 36px;
-  padding:16px 16px 20px;
-  box-shadow:inset 0 3px 6px rgba(255,255,255,.6),inset 0 -5px 10px rgba(0,0,0,.25),0 16px 60px rgba(0,0,0,.8),0 0 0 2px #888880;
-  position:relative;
-}
-.gb-shell::before{content:'';position:absolute;top:0;left:0;right:0;height:52%;background:linear-gradient(155deg,rgba(255,255,255,.35) 0%,transparent 60%);border-radius:10px 10px 0 0;pointer-events:none;}
-.bezel{background:linear-gradient(135deg,#1a1a18,#0a0a08);border-radius:8px 8px 16px 16px;padding:12px 12px 20px;margin-bottom:12px;box-shadow:inset 0 6px 16px rgba(0,0,0,.9),0 2px 4px rgba(255,255,255,.2);position:relative;}
-.bezel-label{position:absolute;top:5px;left:50%;transform:translateX(-50%);font-size:5px;color:#383830;letter-spacing:4px;white-space:nowrap;}
-.power-led{position:absolute;top:7px;right:14px;width:7px;height:7px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff6644,#aa1100);box-shadow:0 0 6px #ff4422;animation:led 2.5s ease-in-out infinite;}
-@keyframes led{0%,100%{opacity:1}50%{opacity:.25}}
-.screen{width:100%;aspect-ratio:10/9;background:var(--gb4);border:3px solid #111;border-radius:3px;position:relative;overflow:hidden;image-rendering:pixelated;box-shadow:inset 0 0 30px rgba(0,0,0,.35);}
-.screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(139,188,15,.15) 0%,transparent 70%);pointer-events:none;z-index:200;}
-.screen::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 4px),repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,.03) 3px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:201;}
-/* PAGES */
-.page{display:none;position:absolute;inset:0;flex-direction:column;align-items:center;}
-.page.active{display:flex;}
-/* CONNECT */
-#pg-connect{background:var(--gb0);justify-content:center;align-items:center;padding:10px;gap:6px;}
-.connect-title{font-size:8px;color:var(--gb5);text-align:center;line-height:1.8;margin-bottom:4px;}
-.connect-sub{font-size:5px;color:var(--gb3);text-align:center;line-height:1.8;}
-.gender-row{width:100%;background:var(--gb1);border-radius:2px;padding:5px 8px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.gender-label{font-size:5px;color:var(--gb3);white-space:nowrap;}
-.gender-btns{display:flex;gap:4px;flex:1;justify-content:center;}
-.gender-btn{background:rgba(45,90,39,.3);border:2px solid var(--gb2);font-family:'Press Start 2P',monospace;font-size:5px;color:var(--gb3);padding:4px 10px;cursor:pointer;border-radius:2px;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s;}
-.gender-btn:hover{background:var(--gb2);color:var(--gb5);}
-.gender-btn.active{background:var(--gb2);color:var(--gb5);border-color:var(--gb5);}
-.connect-row{display:flex;gap:4px;width:100%;}
-.gb-input{flex:1;background:#0a100a;border:2px solid var(--gb2);color:var(--gb5);font-family:'Press Start 2P',monospace;font-size:7px;padding:6px 8px;outline:none;border-radius:2px;transition:border-color .2s;}
-.gb-input:focus{border-color:var(--gb5);}
-.gb-input::placeholder{color:var(--gb2);}
-.gb-input.pass-inp{letter-spacing:3px;text-align:center;}
-.gb-btn{background:var(--gb2);color:var(--gb5);border:2px solid var(--gb3);font-family:'Press Start 2P',monospace;font-size:7px;padding:6px 10px;cursor:pointer;border-radius:2px;white-space:nowrap;transition:all .1s;}
-.gb-btn:hover{background:var(--gb3);}
-.gb-btn:active{transform:translateY(1px);}
-.connect-hint{font-size:4px;color:rgba(45,90,39,.7);text-align:center;line-height:2;}
-@keyframes inputShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
-/* LOBBY */
-#pg-lobby{background:var(--gb4);padding:6px;justify-content:flex-start;gap:4px;}
-.lobby-head{width:100%;text-align:center;font-size:clamp(7px,2vw,10px);color:var(--gb0);line-height:1.8;border-bottom:2px solid var(--gb0);padding-bottom:4px;}
-.add-row{display:flex;gap:3px;width:100%;}
-.players-scroll{width:100%;flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--gb2) var(--gb3);display:flex;flex-direction:column;gap:2px;}
-.p-row{display:flex;align-items:center;gap:4px;background:var(--gb0);color:var(--gb5);padding:4px 7px;border-radius:2px;font-size:7px;flex-shrink:0;animation:slideIn .2s ease-out;}
-@keyframes slideIn{from{transform:translateX(-10px);opacity:0}to{transform:none;opacity:1}}
-.p-row .p-avatar{font-size:15px;line-height:1;}
-.p-row .p-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.p-row .p-score{color:var(--gb4);min-width:40px;text-align:right;}
-.p-del{background:var(--red);color:#fff;border:none;font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 4px;cursor:pointer;border-radius:1px;}
-.start-big{width:100%;padding:8px;font-size:7px;background:var(--gb0);color:var(--gb5);border:2px solid var(--gb1);font-family:'Press Start 2P',monospace;cursor:pointer;border-radius:2px;animation:startPulse 2s ease-in-out infinite;}
-@keyframes startPulse{0%,100%{box-shadow:0 0 0 0 rgba(139,188,15,.5)}50%{box-shadow:0 0 0 5px rgba(139,188,15,0)}}
-.lobby-hint{font-size:4px;color:var(--gb2);text-align:center;line-height:2;}
-/* BATTLE */
-#pg-battle{background:var(--gb4);position:absolute;inset:0;}
-.b-sky{position:absolute;top:0;left:0;right:0;height:55%;background:linear-gradient(to bottom,var(--gb3) 0%,var(--gb4) 100%);overflow:hidden;}
-.pixel-cloud{position:absolute;background:var(--gb5);box-shadow:4px 0 0 var(--gb5),8px 0 0 var(--gb5),-4px 0 0 var(--gb5),0 -4px 0 var(--gb5),4px -4px 0 var(--gb5),0 4px 0 var(--gb6);width:4px;height:4px;animation:cloudDrift linear infinite;opacity:.7;}
-@keyframes cloudDrift{from{transform:translateX(0)}to{transform:translateX(-120%)}}
-.b-ground{position:absolute;bottom:0;left:0;right:0;height:46%;background:var(--gb3);border-top:3px solid var(--gb1);}
-.b-ground::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:repeating-linear-gradient(90deg,var(--gb2) 0px,var(--gb2) 8px,transparent 8px,transparent 16px);opacity:.4;}
-.grass-tuft{position:absolute;bottom:0;width:6px;height:10px;background:var(--gb2);clip-path:polygon(50% 0%,0% 100%,100% 100%);}
-.pokemon-arena{position:absolute;left:6%;bottom:42%;width:28%;display:flex;flex-direction:column;align-items:center;}
-.pokemon-platform{width:120%;height:8px;background:var(--gb2);border-radius:50%;box-shadow:0 3px 0 var(--gb1);margin-top:2px;}
-.poke-svg-wrap{width:100%;filter:drop-shadow(2px 3px 0 var(--gb1));transform-origin:bottom center;}
-.poke-svg-wrap.silhouette svg{filter:brightness(0) saturate(0);}
-.poke-svg-wrap.revealed svg{animation:revealFlash .6s steps(1,end);}
-@keyframes revealFlash{0%{filter:brightness(10)}25%{filter:brightness(0) saturate(0)}50%{filter:brightness(10)}75%{filter:none}100%{filter:none}}
-.poke-idle{animation:pokeIdle 2s ease-in-out infinite;}
-@keyframes pokeIdle{0%,100%{transform:translateY(0) scaleX(1)}40%{transform:translateY(-4px) scaleX(1.02)}80%{transform:translateY(-2px) scaleX(.98)}}
-.trainer-arena{position:absolute;right:6%;bottom:42%;width:22%;display:flex;flex-direction:column;align-items:center;}
-.trainer-platform{width:130%;height:6px;background:var(--gb1);border-radius:50%;box-shadow:0 2px 0 var(--gb0);margin-top:2px;}
-.trainer-svg{width:100%;filter:drop-shadow(2px 3px 0 var(--gb0));animation:trainerBob 1.5s ease-in-out infinite;}
-@keyframes trainerBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-.b-hud-top{position:absolute;top:3px;left:4px;right:4px;display:flex;align-items:center;gap:4px;z-index:10;}
-.ost-badge{background:var(--gb0);color:var(--gb5);font-size:7px;padding:3px 7px;border-radius:1px;border:1px solid var(--gb2);}
-.event-pill{background:var(--gold);color:var(--gb0);font-size:6px;padding:3px 7px;border-radius:1px;display:none;animation:eventPill .5s steps(1,end) infinite;}
-.event-pill.show{display:block;}
-@keyframes eventPill{0%,100%{opacity:1}50%{opacity:.4}}
-.host-actions{margin-left:auto;display:flex;gap:3px;}
-.h-btn{background:var(--gb0);color:var(--gb5);border:1px solid var(--gb2);font-family:'Press Start 2P',monospace;font-size:6px;padding:3px 7px;cursor:pointer;border-radius:1px;transition:background .1s;}
-.h-btn:hover{background:var(--gb2);}
-.timer-wrap{position:absolute;top:22px;left:5px;right:5px;z-index:10;}
-.timer-row{display:flex;justify-content:space-between;font-size:7px;color:var(--gb0);margin-bottom:2px;}
-.timer-track{height:8px;background:var(--gb2);border:1px solid var(--gb0);border-radius:1px;overflow:hidden;}
-.timer-fill{height:100%;background:var(--gb0);transition:width 1s linear;border-radius:1px;position:relative;}
-.timer-fill::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0,transparent 4px,rgba(255,255,255,.15) 4px,rgba(255,255,255,.15) 5px);}
-.timer-fill.warn{background:var(--gold);}
-.timer-fill.danger{background:var(--red);animation:dangerFlash .4s step-end infinite;}
-@keyframes dangerFlash{0%,100%{opacity:1}50%{opacity:.3}}
-/* Answer progress */
-.ans-progress{position:absolute;top:40px;left:5px;right:5px;z-index:10;}
-.ans-progress-track{height:3px;background:rgba(15,26,15,.4);border-radius:1px;overflow:hidden;}
-.ans-progress-fill{height:100%;background:var(--gb5);border-radius:1px;width:0%;transition:width .3s;}
-.ans-progress-label{font-size:4px;color:var(--gb1);text-align:right;margin-top:1px;}
-.encounter-msg{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:clamp(8px,2.5vw,12px);color:var(--gb0);text-align:center;line-height:2;z-index:50;pointer-events:none;opacity:0;}
-.encounter-msg.show{animation:encAnim 2.8s ease-out forwards;}
-@keyframes encAnim{0%{opacity:0;transform:translate(-50%,-40%)}20%{opacity:1;transform:translate(-50%,-50%)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%)}}
-.b-ui{position:absolute;bottom:0;left:0;right:0;height:40%;background:var(--gb4);border-top:3px solid var(--gb0);display:grid;grid-template-columns:1fr 1fr;}
-.ui-box{padding:4px 5px;border-right:2px solid var(--gb0);display:flex;flex-direction:column;gap:2px;overflow:hidden;}
-.ui-box:last-child{border-right:none;}
-.ui-title{font-size:7px;color:var(--gb0);border-bottom:1px solid var(--gb2);padding-bottom:2px;margin-bottom:1px;}
-.wave-bars{display:flex;align-items:flex-end;gap:2px;height:14px;}
-.wb{width:4px;background:var(--gb0);border-radius:1px;animation:waveAnim .7s ease-in-out infinite alternate;}
-.wb:nth-child(1){height:5px;animation-delay:.0s}.wb:nth-child(2){height:11px;animation-delay:.1s}.wb:nth-child(3){height:7px;animation-delay:.15s}.wb:nth-child(4){height:13px;animation-delay:.05s}.wb:nth-child(5){height:6px;animation-delay:.2s}.wb:nth-child(6){height:10px;animation-delay:.12s}.wb:nth-child(7){height:5px;animation-delay:.08s}
-@keyframes waveAnim{from{transform:scaleY(.4)}to{transform:scaleY(1)}}
-.mini-scores{flex:1;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;gap:2px;}
-.ms-row{display:flex;gap:3px;align-items:center;font-size:6px;color:var(--gb0);padding:2px 3px;border-radius:1px;flex-shrink:0;}
-.ms-row.top1{background:rgba(232,192,32,.25);}
-.ms-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ms-pts{color:var(--gb1);font-size:6px;}
-/* HOST ANSWERS PANEL inside battle */
-.host-answers-live{position:absolute;bottom:41%;left:0;right:0;background:rgba(15,26,15,.9);border-top:2px solid var(--gb1);border-bottom:2px solid var(--gb0);padding:3px 5px;max-height:80px;overflow-y:auto;z-index:12;display:none;}
-.host-mode .host-answers-live{display:block;}
-/* ANSWER OVERLAY */
-.answer-overlay{position:absolute;bottom:0;left:0;right:0;background:var(--gb4);border-top:3px solid var(--gb0);padding:5px 7px;z-index:100;display:none;}
-.answer-overlay.show{display:block;}
-.ans-head{display:flex;justify-content:space-between;font-size:7px;color:var(--gb0);margin-bottom:4px;}
-.ans-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
-.ans-opt{background:var(--gb0);color:var(--gb5);border:2px solid var(--gb1);font-family:'Press Start 2P',monospace;font-size:6px;padding:6px 8px;cursor:pointer;border-radius:2px;text-align:left;line-height:1.8;transition:all .1s;position:relative;overflow:hidden;}
-.ans-opt::before{content:attr(data-letter);position:absolute;top:2px;right:4px;font-size:5px;color:var(--gb3);}
-.ans-opt:hover{background:var(--gb1);border-color:var(--gb4);}
-.ans-opt.sel{background:var(--gb1);border-color:var(--gb5);}
-.ans-opt.correct{background:var(--gb1);border-color:var(--gb5);color:var(--gb7);}
-.ans-opt.wrong{background:#330000;border-color:var(--red);color:#ff8888;}
-/* EVENT MODAL */
-.event-modal{position:absolute;inset:0;background:rgba(0,10,0,.85);z-index:180;display:none;align-items:center;justify-content:center;}
-.event-modal.show{display:flex;}
-.event-card{background:var(--gb0);border:3px solid var(--gb4);padding:10px 12px;text-align:center;border-radius:3px;width:80%;transform:scale(0);transition:transform .35s cubic-bezier(.34,1.56,.64,1);}
-.event-modal.show .event-card{transform:scale(1);}
-.ev-icon{font-size:24px;margin-bottom:6px;}
-.ev-title{font-size:7px;color:var(--gb5);line-height:1.8;margin-bottom:4px;}
-.ev-desc{font-size:5px;color:var(--gb3);line-height:1.8;}
-/* POKEBALL */
-.pokeball-throw{position:absolute;right:26%;bottom:52%;width:20px;height:20px;opacity:0;z-index:60;pointer-events:none;}
-.pokeball-throw.active{animation:pbThrow 1.4s ease-in-out forwards;}
-@keyframes pbThrow{0%{opacity:1;right:26%;bottom:52%;transform:scale(.5) rotate(0deg);}35%{right:50%;bottom:62%;transform:scale(1) rotate(400deg);}65%{right:68%;bottom:46%;transform:scale(.7) rotate(600deg);}100%{right:67%;bottom:44%;transform:scale(.8) rotate(620deg);opacity:1;}}
-/* PARTICLES */
-.particle{position:absolute;width:4px;height:4px;pointer-events:none;z-index:70;}
-/* SHAKE */
-.screen.shake{animation:screenShake .4s ease-out;}
-@keyframes screenShake{0%{transform:translate(0,0)}15%{transform:translate(-4px,2px)}30%{transform:translate(4px,-2px)}45%{transform:translate(-3px,3px)}60%{transform:translate(3px,-1px)}100%{transform:translate(0,0)}}
-/* FLASH */
-.flash{position:absolute;inset:0;background:#e8f0c8;opacity:0;pointer-events:none;z-index:300;}
-.flash.fire{animation:flashAnim .5s ease-out forwards;}
-@keyframes flashAnim{0%{opacity:.95}100%{opacity:0}}
-/* FADE */
-.gb-fade{position:absolute;inset:0;background:var(--gb0);opacity:0;pointer-events:none;z-index:400;}
-/* REVEAL */
-#pg-reveal{background:var(--gb4);padding:6px;justify-content:flex-start;gap:5px;}
-.rev-head{width:100%;font-size:6px;color:var(--gb0);text-align:center;border-bottom:2px solid var(--gb0);padding-bottom:4px;line-height:1.8;}
-.rev-pokemon{width:60px;height:60px;filter:drop-shadow(3px 4px 0 var(--gb0));animation:revFloat 2s ease-in-out infinite;flex-shrink:0;}
-@keyframes revFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-.rev-ost-name{font-size:clamp(6px,2vw,8px);color:var(--gb0);text-align:center;line-height:1.8;}
-.rev-game{font-size:5px;color:var(--gb1);text-align:center;line-height:1.8;}
-.sb{width:100%;flex:1;border:2px solid var(--gb0);border-radius:2px;overflow:hidden;display:flex;flex-direction:column;}
-.sb-head{background:var(--gb0);color:var(--gb5);font-size:5px;padding:3px 6px;display:grid;grid-template-columns:16px 1fr auto;gap:4px;flex-shrink:0;}
-.sb-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;}
-.sb-row{display:grid;grid-template-columns:16px 1fr auto;gap:4px;padding:3px 6px;font-size:5px;border-bottom:1px solid var(--gb2);align-items:center;}
-.sb-row:last-child{border-bottom:none;}
-.sb-row.gold{background:rgba(232,192,32,.15);}
-.sb-rank{color:var(--gb2);}.sb-name{color:var(--gb0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.sb-pts{color:var(--gb0);}
-.rev-actions{display:flex;gap:3px;width:100%;}
-/* FINAL */
-#pg-final{background:var(--gb4);padding:6px;justify-content:flex-start;gap:5px;}
-.final-title{font-size:7px;color:var(--gb0);text-align:center;border-bottom:2px solid var(--gb0);padding-bottom:4px;width:100%;line-height:1.8;}
-.podium{display:flex;align-items:flex-end;justify-content:center;gap:4px;width:100%;}
-.pod-col{display:flex;flex-direction:column;align-items:center;gap:2px;}
-.pod-sprite{font-size:18px;}.pod-name{font-size:4px;color:var(--gb0);text-align:center;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.pod-pts{font-size:4px;color:var(--gb1);}
-.pod-block{display:flex;align-items:center;justify-content:center;font-size:7px;border-radius:2px 2px 0 0;width:56px;}
-.pod-1 .pod-block{height:48px;background:var(--gb0);color:var(--gold);}.pod-2 .pod-block{height:34px;background:var(--gb1);color:#ccc;}.pod-3 .pod-block{height:24px;background:var(--gb2);color:#cd7f32;}
-.full-sb{width:100%;flex:1;overflow-y:auto;border:2px solid var(--gb0);border-radius:2px;}
-/* CONTROLS */
-.gb-controls{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 4px 4px;}
-.dpad{position:relative;width:56px;height:56px;flex-shrink:0;}
-.dp-h,.dp-v{position:absolute;background:var(--gb0);box-shadow:inset 0 2px 5px rgba(0,0,0,.5);}
-.dp-h{width:100%;height:33%;top:33%;border-radius:2px;}.dp-v{width:33%;height:100%;left:33%;border-radius:2px;}.dp-c{position:absolute;width:33%;height:33%;top:33%;left:33%;background:#0a0f0a;}
-.ss-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;padding:0 8px;}
-.ss-btns{display:flex;gap:12px;}
-.ss-btn{background:linear-gradient(to bottom,#777,#444);border:none;border-radius:20px;width:38px;height:9px;box-shadow:0 2px 4px rgba(0,0,0,.5);cursor:pointer;font-family:'Press Start 2P',monospace;font-size:4px;color:#bbb;transition:transform .1s;}
-.ss-btn:active{transform:translateY(1px);}
-.gb-brand{font-size:7px;color:#888878;letter-spacing:1px;margin-top:2px;}
-.ab-wrap{display:flex;gap:6px;align-items:center;flex-shrink:0;margin-top:6px;}
-.btn-b,.btn-a{border:none;border-radius:50%;font-family:'Press Start 2P',monospace;font-size:7px;color:#fff;cursor:pointer;box-shadow:inset 0 2px 3px rgba(255,255,255,.25),0 4px 0 rgba(0,0,0,.5);transition:all .1s;display:flex;align-items:center;justify-content:center;}
-.btn-b{width:30px;height:30px;margin-top:8px;background:radial-gradient(circle at 35% 35%,#cc2200,#661100);}
-.btn-a{width:36px;height:36px;background:radial-gradient(circle at 35% 35%,#cc2200,#661100);}
-.btn-b:active,.btn-a:active{box-shadow:inset 0 2px 3px rgba(0,0,0,.3),0 1px 0 rgba(0,0,0,.4);transform:translateY(2px);}
-/* HOST MODE */
-.host-only{display:none !important;}
-.host-mode .host-only{display:flex !important;}
-.host-mode .host-only-block{display:block !important;}
-.host-only-block{display:none !important;}
-.host-mode #start-locked{display:none !important;}
-/* HOST BADGE */
-.host-badge{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--gb0);font-family:'Press Start 2P',monospace;font-size:6px;padding:4px 10px;border-radius:2px;z-index:4000;box-shadow:0 2px 8px rgba(232,192,32,.4);display:none;gap:6px;align-items:center;}
-.host-badge.show{display:flex;}
-.host-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--gb0);animation:badgePulse 1.5s ease-in-out infinite;}
-@keyframes badgePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
-/* NOTIFY */
-.notif{position:fixed;bottom:16px;right:16px;background:var(--gb0);color:var(--gb5);font-size:5px;padding:6px 10px;border:2px solid var(--gb4);border-radius:2px;z-index:10000;transform:translateX(130%);transition:transform .25s;max-width:200px;line-height:1.8;}
-.notif.show{transform:translateX(0);}
-/* EXT PANELS */
-.ext-wrap{width:min(var(--screen-w),96vw);margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.ext-panel{background:rgba(10,26,10,.7);border:1px solid rgba(45,90,39,.4);border-radius:4px;padding:8px 10px;}
-.ext-title{font-size:6px;color:var(--gb4);border-bottom:1px solid rgba(45,90,39,.4);padding-bottom:5px;margin-bottom:6px;}
-.ost-grid{display:flex;flex-direction:column;gap:2px;max-height:150px;overflow-y:auto;scrollbar-width:thin;}
-.ost-row{font-size:4px;color:rgba(139,188,15,.5);padding:2px 4px;border-left:2px solid rgba(45,90,39,.3);line-height:1.6;transition:all .3s;}
-.ost-row.played{color:var(--gb5);border-left-color:var(--gb4);background:rgba(139,188,15,.08);}
-.ost-row.current{color:var(--gb7);border-left-color:var(--gb6);background:rgba(139,188,15,.15);animation:currentBlink .8s step-end infinite;}
-@keyframes currentBlink{0%,100%{opacity:1}50%{opacity:.6}}
-.legend-grid{display:flex;flex-direction:column;gap:3px;}
-.legend-row{font-size:4px;color:var(--gb3);line-height:1.8;display:flex;gap:4px;align-items:flex-start;}
-/* ── PROFESSOR PAGE ─────────────────────────────── */
-#pg-prof{
-  background:var(--gb0);
-  position:absolute;inset:0;
-  display:none;flex-direction:column;
-  align-items:center;justify-content:flex-end;
-  overflow:hidden;
-}
-#pg-prof.active{ display:flex; }
-
-/* Animated background — subtle grid */
-.prof-bg{
-  position:absolute;inset:0;
-  background:
-    repeating-linear-gradient(0deg,transparent 0,transparent 7px,rgba(139,188,15,.06) 7px,rgba(139,188,15,.06) 8px),
-    repeating-linear-gradient(90deg,transparent 0,transparent 7px,rgba(139,188,15,.06) 7px,rgba(139,188,15,.06) 8px);
-  animation:bgScroll 8s linear infinite;
-}
-@keyframes bgScroll{from{background-position:0 0,0 0}to{background-position:0 80px,80px 0}}
-
-/* Professor sprite container */
-.prof-stage{
-  position:absolute;
-  bottom:105px;
-  left:50%;transform:translateX(-50%);
-  display:flex;flex-direction:column;align-items:center;
-  animation:profEntry .6s cubic-bezier(.34,1.56,.64,1) both;
-}
-@keyframes profEntry{from{transform:translateX(-50%) translateY(30px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
-
-.prof-name-tag{
-  background:var(--gb0);
-  border:2px solid var(--gb4);
-  color:var(--gb5);
-  font-size:5px;
-  padding:2px 8px;
-  border-radius:1px;
-  margin-bottom:4px;
-  letter-spacing:1px;
-}
-
-/* Dialog box — classic RPG style */
-.prof-dialog{
-  position:absolute;
-  bottom:0;left:0;right:0;
-  background:var(--gb7);
-  border-top:4px solid var(--gb0);
-  padding:10px 14px 12px;
-  min-height:100px;
-  z-index:10;
-}
-.prof-dialog-inner{
-  border:3px solid var(--gb0);
-  border-radius:2px;
-  padding:8px 10px;
-  background:var(--gb6);
-  min-height:70px;
-  position:relative;
-  display:flex;flex-direction:column;justify-content:space-between;
-}
-.prof-text{
-  font-size:6px;
-  color:var(--gb0);
-  line-height:2;
-  min-height:40px;
-  word-break:break-word;
-}
-.prof-cursor{
-  display:inline-block;
-  width:7px;height:7px;
-  border-right:3px solid var(--gb0);
-  border-bottom:3px solid var(--gb0);
-  transform:rotate(45deg) translateY(-2px);
-  margin-left:4px;
-  animation:cursorBlink .6s step-end infinite;
-  vertical-align:middle;
-  opacity:0;
-}
-.prof-cursor.show{ opacity:1; }
-@keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
-
-.prof-hint{
-  font-size:4px;
-  color:var(--gb2);
-  text-align:right;
-  margin-top:4px;
-  animation:hintBlink 1.2s ease-in-out infinite;
-}
-@keyframes hintBlink{0%,100%{opacity:1}50%{opacity:.3}}
-
-/* Progress dots */
-.prof-dots{
-  display:flex;gap:4px;justify-content:center;
-  margin-top:5px;
-}
-.prof-dot{
-  width:5px;height:5px;border-radius:50%;
-  background:var(--gb2);transition:background .3s;
-}
-.prof-dot.done{ background:var(--gb0); }
-.prof-dot.active{ background:var(--gb4); animation:dotPulse .6s ease-in-out infinite alternate; }
-@keyframes dotPulse{from{transform:scale(1)}to{transform:scale(1.4)}}
-
-/* Firebase config warning */
-.config-warning{background:rgba(204,34,0,.15);border:2px solid var(--red);border-radius:3px;padding:10px 12px;font-size:5px;color:#ff8844;line-height:2;text-align:center;width:min(var(--screen-w),96vw);margin-bottom:10px;display:none;}
-.config-warning.show{display:block;}
-/* Reset confirm dialog */
-.reset-dialog{position:fixed;inset:0;background:rgba(0,5,0,.92);z-index:6000;display:none;align-items:center;justify-content:center;}
-.reset-dialog.show{display:flex;}
-.reset-card{background:var(--gb0);border:3px solid var(--red);border-radius:4px;padding:18px 22px;text-align:center;width:min(320px,90vw);animation:lockCardIn .25s ease-out;}
-@keyframes lockCardIn{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
-.reset-title{font-size:8px;color:#ff6644;line-height:1.8;margin-bottom:6px;}
-.reset-sub{font-size:5px;color:var(--gb3);line-height:2;margin-bottom:14px;}
-.reset-btns{display:flex;gap:8px;justify-content:center;}
-.r-btn{background:var(--red);color:#fff;border:2px solid #ff4422;font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;border-radius:2px;}
-.r-btn-cancel{background:var(--gb1);color:var(--gb4);border:2px solid var(--gb2);font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;border-radius:2px;}
-</style>
-</head>
-<body>
-
-<!-- Firebase config warning -->
-<div class="config-warning" id="config-warn">
-  ⚠️ FIREBASE NON CONFIGURÉ — Remplace les valeurs dans le code<br>
-  <span style="font-size:4px">Voir le fichier README ci-dessous pour les instructions</span>
-</div>
-
-<!-- GAMEBOY -->
-<div class="gb-shell">
-  <div class="bezel">
-    <div class="bezel-label">DOT MATRIX WITH STEREO SOUND</div>
-    <div class="power-led"></div>
-    <div class="screen" id="screen">
-
-      <!-- ── CONNECT ─────────────────────────────── -->
-      <div class="page active" id="pg-connect">
-        <div class="connect-title">POKÉMON<br>OST BLINDTEST<br><span style="font-size:.6em;color:var(--gb3)">30ème ANNIVERSAIRE</span></div>
-        <div class="gender-row">
-          <div class="gender-label">DRESSEUR :</div>
-          <div class="gender-btns">
-            <button class="gender-btn active" id="gbtn-m" onclick="window._fb.selectGender('m')">
-              <svg width="22" height="30" viewBox="0 0 40 55"><rect x="13" y="22" width="14" height="18" fill="#8bbc0f"/><rect x="14" y="10" width="12" height="11" fill="#d4a060"/><rect x="12" y="8" width="16" height="5" fill="#1a3320"/><rect x="16" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="22" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="13" y="40" width="6" height="12" fill="#1a3320"/><rect x="21" y="40" width="6" height="12" fill="#1a3320"/></svg>
-              <span>GARÇON</span>
-            </button>
-            <button class="gender-btn" id="gbtn-f" onclick="window._fb.selectGender('f')">
-              <svg width="22" height="30" viewBox="0 0 40 55"><rect x="12" y="24" width="16" height="14" rx="5" fill="#b84090"/><ellipse cx="20" cy="34" rx="12" ry="6" fill="#d060a8"/><rect x="14" y="10" width="12" height="11" fill="#f4c080"/><rect x="12" y="6" width="16" height="6" fill="#c84888"/><rect x="16" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="22" y="14" width="2" height="2" fill="#0a0f0a"/><rect x="15" y="38" width="5" height="14" rx="2" fill="#c84888"/><rect x="21" y="38" width="5" height="14" rx="2" fill="#c84888"/></svg>
-              <span>FILLE</span>
-            </button>
-          </div>
-        </div>
-        <div class="connect-row">
-          <input class="gb-input" id="join-name" placeholder="Ton pseudo..." maxlength="14" autocomplete="off">
-        </div>
-        <div class="connect-row">
-          <input class="gb-input pass-inp" id="join-pass" type="password" placeholder="Animateur? → mot de passe" maxlength="20" autocomplete="off">
-        </div>
-        <button class="gb-btn" style="width:100%;font-size:7px;padding:8px;" onclick="window._fb.joinGame()">▶ REJOINDRE</button>
-        <div class="connect-hint">
-          Laisse le mot de passe vide si tu es joueur<br>
-          Entre le code animateur pour gérer la partie
-        </div>
-      </div>
-
-      <!-- ── PROFESSEUR GRAPH ───────────────────────── -->
-      <div class="page" id="pg-prof">
-        <div class="prof-bg"></div>
-
-        <!-- Professor pixel-art sprite -->
-        <div class="prof-stage" id="prof-stage">
-          <div class="prof-name-tag">Dr. GRAPH</div>
-          <!-- Prof. Graph SVG — blouse blanche, lunettes, cheveux grisonnants -->
-          <svg width="90" height="130" viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg">
-            <!-- Blouse -->
-            <rect x="14" y="36" width="32" height="30" rx="2" fill="#e8f0c8"/>
-            <rect x="14" y="36" width="32" height="6" fill="#d4e8a0"/>
-            <!-- Col chemise & cravate -->
-            <rect x="26" y="36" width="8" height="20" fill="#b8d860"/>
-            <rect x="28" y="38" width="4" height="14" fill="#2d5a27"/>
-            <!-- Tête -->
-            <rect x="18" y="16" width="24" height="22" rx="4" fill="#d4a878"/>
-            <!-- Cheveux grisonnants -->
-            <rect x="16" y="12" width="28" height="10" rx="3" fill="#a8a898"/>
-            <rect x="14" y="16" width="6" height="8" rx="2" fill="#a8a898"/>
-            <rect x="40" y="16" width="6" height="8" rx="2" fill="#a8a898"/>
-            <rect x="18" y="10" width="24" height="6" rx="2" fill="#888878"/>
-            <!-- Lunettes -->
-            <rect x="18" y="24" width="9" height="7" rx="2" fill="none" stroke="#1a3320" stroke-width="1.5"/>
-            <rect x="33" y="24" width="9" height="7" rx="2" fill="none" stroke="#1a3320" stroke-width="1.5"/>
-            <rect x="27" y="26" width="6" height="2" fill="#1a3320"/>
-            <rect x="14" y="26" width="4" height="2" fill="#1a3320"/>
-            <rect x="42" y="26" width="4" height="2" fill="#1a3320"/>
-            <!-- Yeux derrière lunettes -->
-            <rect x="21" y="26" width="3" height="3" fill="#0a0f0a"/>
-            <rect x="36" y="26" width="3" height="3" fill="#0a0f0a"/>
-            <!-- Reflet lunettes -->
-            <rect x="19" y="25" width="2" height="2" fill="rgba(255,255,255,.5)"/>
-            <rect x="34" y="25" width="2" height="2" fill="rgba(255,255,255,.5)"/>
-            <!-- Moustache / sourcils -->
-            <rect x="19" y="22" width="8" height="2" rx="1" fill="#888878"/>
-            <rect x="33" y="22" width="8" height="2" rx="1" fill="#888878"/>
-            <!-- Sourire -->
-            <rect x="24" y="33" width="12" height="2" rx="1" fill="#a06040"/>
-            <rect x="25" y="34" width="2" height="2" fill="#e8c0a0"/>
-            <rect x="33" y="34" width="2" height="2" fill="#e8c0a0"/>
-            <!-- Bras gauche (levé, comme dans Pokémon) -->
-            <rect x="4" y="34" width="10" height="6" rx="3" fill="#e8f0c8" transform="rotate(-30 4 34)"/>
-            <rect x="2" y="28" width="8" height="8" rx="3" fill="#d4a878"/>
-            <!-- Bras droit -->
-            <rect x="46" y="36" width="10" height="6" rx="3" fill="#e8f0c8"/>
-            <rect x="54" y="36" width="6" height="8" rx="3" fill="#d4a878"/>
-            <!-- Jambes -->
-            <rect x="18" y="66" width="10" height="18" rx="2" fill="#2d5a27"/>
-            <rect x="32" y="66" width="10" height="18" rx="2" fill="#2d5a27"/>
-            <!-- Chaussures -->
-            <rect x="16" y="80" width="14" height="6" rx="2" fill="#0a0f0a"/>
-            <rect x="30" y="80" width="14" height="6" rx="2" fill="#0a0f0a"/>
-            <!-- Poche blouse -->
-            <rect x="16" y="46" width="8" height="10" rx="1" fill="#d4e8a0" stroke="#b8c878" stroke-width="1"/>
-            <rect x="17" y="47" width="3" height="8" fill="#2d5a27" opacity=".4"/>
-          </svg>
-        </div>
-
-        <!-- Dialog box -->
-        <div class="prof-dialog">
-          <div class="prof-dialog-inner">
-            <div class="prof-text" id="prof-text"></div>
-            <span class="prof-cursor" id="prof-cursor"></span>
-            <div class="prof-hint" id="prof-hint">▼ Appuyer sur A pour continuer</div>
-          </div>
-          <div class="prof-dots" id="prof-dots"></div>
-        </div>
-      </div>
-
-      <!-- ── LOBBY ──────────────────────────────────── -->
-      <div class="page" id="pg-lobby">
-        <div class="lobby-head">
-          ⚡ SALLE D'ATTENTE ⚡<br>
-          <span style="font-size:5px;color:var(--gb1)">JOUEURS : <span id="lobby-count">0</span></span>
-        </div>
-        <div class="players-scroll" id="players-list"></div>
-        <button class="start-big host-only-block" onclick="window._fb.startGame()">▶ LANCER LE BLINDTEST</button>
-        <div id="start-locked" style="width:100%;padding:7px;background:var(--gb1);border-radius:2px;font-size:5px;color:var(--gb2);text-align:center;line-height:2;">
-          ⏳ EN ATTENTE DU LANCEMENT<br>
-          <span style="font-size:4px">L'animateur va démarrer la partie</span>
-        </div>
-        <!-- Host reset button -->
-        <button class="host-only-block" id="btn-full-reset" onclick="confirmFullReset()"
-          style="width:100%;padding:5px;font-size:5px;background:rgba(204,34,0,.15);color:#ff6644;border:1px solid rgba(204,34,0,.4);font-family:'Press Start 2P',monospace;cursor:pointer;border-radius:2px;margin-top:2px;">
-          🗑️ RESET COMPLET (efface tout)
-        </button>
-        <div class="lobby-hint">
-          🎵 Partage d'écran Discord pour la musique<br>
-          🎲 Évènements spéciaux aléatoires · ⏱ 30 sec/OST
-        </div>
-      </div>
-
-      <!-- ── BATTLE ─────────────────────────────────── -->
-      <div class="page" id="pg-battle">
-        <div class="b-sky" id="b-sky"></div>
-        <div class="b-ground"></div>
-        <div class="pokemon-arena" id="poke-arena">
-          <div class="poke-svg-wrap silhouette poke-idle" id="poke-wrap"></div>
-          <div class="pokemon-platform"></div>
-        </div>
-        <div class="trainer-arena">
-          <svg class="trainer-svg" id="trainer-svg" viewBox="0 0 40 55" xmlns="http://www.w3.org/2000/svg"></svg>
-          <div class="trainer-platform"></div>
-        </div>
-        <div class="b-hud-top">
-          <div class="ost-badge" id="ost-badge">OST 1/30</div>
-          <div class="event-pill" id="ev-pill">⚡ EVENT</div>
-          <div class="host-actions host-only">
-            <button class="h-btn" onclick="window._fb.hostReveal()">🔍 RÉVÉLER</button>
-            <button class="h-btn" onclick="window._fb.hostSkip()">⏭ SKIP</button>
-          </div>
-        </div>
-        <div class="timer-wrap">
-          <div class="timer-row"><span>TEMPS</span><span id="t-disp">30</span></div>
-          <div class="timer-track"><div class="timer-fill" id="t-fill" style="width:100%"></div></div>
-        </div>
-        <div class="ans-progress">
-          <div class="ans-progress-track"><div class="ans-progress-fill" id="answer-progress-bar"></div></div>
-          <div class="ans-progress-label" id="answer-progress-label">0/0 réponses</div>
-        </div>
-        <!-- Live answers panel (host only) -->
-        <div class="host-answers-live" id="host-answers-panel"></div>
-        <div class="encounter-msg" id="enc-msg">UN OST SAUVAGE<br>APPARAÎT !</div>
-        <div class="pokeball-throw" id="pb-throw">
-          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="#e8f0c8" stroke-width="1.5"/><rect x="1" y="9" width="18" height="2" fill="#e8f0c8"/><path d="M1 10 Q5 4 10 1 Q15 4 19 10" fill="#cc2200"/><circle cx="10" cy="10" r="3.5" fill="#0f1a0f" stroke="#e8f0c8" stroke-width="1"/><circle cx="10" cy="10" r="1.5" fill="#e8f0c8"/></svg>
-        </div>
-        <div class="b-ui">
-          <div class="ui-box">
-            <div class="ui-title">🎵 EN COURS</div>
-            <div class="wave-bars"><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div></div>
-            <div style="font-size:4px;color:var(--gb1);margin-top:2px;line-height:1.8;">Origine : ???<br>Jeu : ???</div>
-          </div>
-          <div class="ui-box">
-            <div class="ui-title">📊 SCORES</div>
-            <div class="mini-scores" id="mini-scores"></div>
-          </div>
-        </div>
-        <div class="answer-overlay" id="ans-overlay">
-          <div class="ans-head"><span>QUE FAIRE ?</span><span id="ans-t">30</span></div>
-          <div class="ans-grid" id="ans-grid"></div>
-        </div>
-        <div class="event-modal" id="ev-modal">
-          <div class="event-card">
-            <div class="ev-icon" id="ev-icon">⚡</div>
-            <div class="ev-title" id="ev-title">ÉVÈNEMENT !</div>
-            <div class="ev-desc" id="ev-desc"></div>
-          </div>
-        </div>
-        <div class="flash" id="flash"></div>
-        <div class="gb-fade" id="fade-battle"></div>
-      </div>
-
-      <!-- ── REVEAL ──────────────────────────────────── -->
-      <div class="page" id="pg-reveal">
-        <div class="rev-head">🎉 OST CAPTURÉ !</div>
-        <svg class="rev-pokemon" id="rev-pokemon-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"></svg>
-        <div class="rev-ost-name" id="rev-name">—</div>
-        <div class="rev-game" id="rev-game">—</div>
-        <div class="sb" id="sb">
-          <div class="sb-head"><span>#</span><span>JOUEUR</span><span>PTS</span></div>
-          <div class="sb-scroll" id="sb-rows"></div>
-        </div>
-        <div class="rev-actions host-only">
-          <button class="gb-btn" style="flex:1" onclick="window._fb.hostNextTrack()">▶ SUIVANT</button>
-          <button class="gb-btn" onclick="window._fb.hostResetGame()">↺</button>
-        </div>
-        <div style="font-size:5px;color:var(--gb2);text-align:center;padding:3px 0;" id="waiting-next">⏳ En attente de l'animateur…</div>
-        <div class="gb-fade" id="fade-reveal"></div>
-      </div>
-
-      <!-- ── FINAL ──────────────────────────────────── -->
-      <div class="page" id="pg-final">
-        <div class="final-title">🏆 FIN DU BLINDTEST !<br>30 ANS DE POKÉMON</div>
-        <div class="podium" id="podium"></div>
-        <div class="full-sb" id="full-sb"></div>
-        <button class="start-big host-only-block" onclick="window._fb.hostResetGame()" style="font-size:5px;margin-top:4px;">↺ REJOUER</button>
-      </div>
-
-    </div><!-- /screen -->
-  </div><!-- /bezel -->
-
-  <!-- Controls -->
-  <div class="gb-controls">
-    <div class="dpad"><div class="dp-h"></div><div class="dp-v"></div><div class="dp-c"></div></div>
-    <div class="ss-wrap">
-      <div class="ss-btns">
-        <button class="ss-btn">SELECT</button>
-        <button class="ss-btn" onclick="window._fb.joinGame()">START</button>
-      </div>
-      <div class="gb-brand">Game Boy®</div>
-    </div>
-    <div class="ab-wrap">
-      <div class="btn-b">B</div>
-      <div class="btn-a" onclick="if(L.phase==='prof') window._fb.profAdvance(); else window._fb.joinGame();">A</div>
-    </div>
-  </div>
-</div>
-
-<!-- External panels (animateur only) -->
-<div class="ext-wrap">
-  <div class="ext-panel">
-    <div class="ext-title" style="display:flex;justify-content:space-between;align-items:center;">
-      <span>📀 LISTE OSTs</span>
-      <button onclick="window._fb.toggleOstPanel()" id="ost-toggle-btn" class="host-only"
-        style="background:var(--gb0);color:var(--gb4);border:1px solid rgba(45,90,39,.5);font-family:'Press Start 2P',monospace;font-size:5px;padding:2px 6px;cursor:pointer;border-radius:2px;">
-        🔒 VOIR
-      </button>
-    </div>
-    <div id="ost-panel-locked" style="font-size:5px;color:rgba(139,188,15,.3);text-align:center;padding:12px 0;line-height:2;">
-      🔒 MASQUÉ<br><span style="font-size:4px">Connectez-vous en animateur pour voir</span>
-    </div>
-    <div class="ost-grid" id="ost-grid" style="display:none;"></div>
-  </div>
-  <div class="ext-panel">
-    <div class="ext-title">📖 LÉGENDE EVENTS</div>
-    <div class="legend-grid">
-      <div class="legend-row"><span>⭐</span><span>DOUBLE — ×2 pts ce round</span></div>
-      <div class="legend-row"><span>⚡</span><span>SPEED — +50 pts au 1er correct</span></div>
-      <div class="legend-row"><span>🎭</span><span>VOLEUR — vole 20 pts au leader</span></div>
-      <div class="legend-row"><span>💎</span><span>BONUS +100 à tous les corrects</span></div>
-      <div class="legend-row"><span>🚫</span><span>PIÈGE — 0 pts ce round</span></div>
-      <div class="legend-row"><span>🌟</span><span>LÉGENDAIRE — ×3 pts !</span></div>
-    </div>
-  </div>
-</div>
-
-<div class="host-badge" id="host-badge">
-  <div class="host-badge-dot"></div>
-  ANIMATEUR CONNECTÉ
-</div>
-
-<div class="notif" id="notif"></div>
-
-<!-- Reset confirm dialog -->
-<div class="reset-dialog" id="reset-dialog">
-  <div class="reset-card">
-    <div class="reset-title">⚠️ RESET COMPLET ?</div>
-    <div class="reset-sub">
-      Ceci va effacer :<br>
-      tous les joueurs · tous les scores · toute la partie<br><br>
-      <span style="color:var(--red)">Cette action est irréversible !</span>
-    </div>
-    <div class="reset-btns">
-      <button class="r-btn" onclick="doFullReset()">🗑️ CONFIRMER</button>
-      <button class="r-btn-cancel" onclick="document.getElementById('reset-dialog').classList.remove('show')">ANNULER</button>
-    </div>
-  </div>
-</div>
-
-<script type="module">
-  function confirmFullReset(){
-    document.getElementById('reset-dialog').classList.add('show');
-  }
-  async function doFullReset(){
-    document.getElementById('reset-dialog').classList.remove('show');
-    await window._fb.hostFullReset();
-  }
-  window.confirmFullReset = confirmFullReset;
-  window.doFullReset = doFullReset;
-</script>
-
-<!-- Check Firebase config -->
-<script type="module">
-  setTimeout(()=>{
-    const scripts = document.querySelectorAll('script[type="module"]');
-    for(const s of scripts){
-      if(s.textContent.includes('REMPLACE_PAR_TA_CLE')){
-        document.getElementById('config-warn').classList.add('show');
-        break;
-      }
-    }
-  },500);
-</script>
-
 </body>
 </html>
