@@ -23,7 +23,7 @@ const firebaseConfig = {
   projectId:         "blindest-30-ans",
   storageBucket:     "blindest-30-ans.firebasestorage.app",
   messagingSenderId: "254739323206",
-  appId:             "1:254739323206:web:412541f301048ee0bf2d47"
+  appId:             "1:254739323206:web:412541f301048ee0bf2d47",
 };
 // ↑↑↑ FIN CONFIG ↑↑↑
 
@@ -271,18 +271,14 @@ async function joinGame(){
 
   // Check current game state
   const state = await fbGet('state');
-  if(state && state.phase && state.phase !== 'lobby'){
+  if(state && state.phase && state.phase !== 'lobby' && state.phase !== 'professor'){
     // Game already running — sync to current state
     L.gameState = state;
     syncGameState(state);
   } else {
-    showPage('lobby');
-    if(L.isHost){
-      showHostBadge();
-      notify('✅ Connecté en tant qu\'animateur !');
-    } else {
-      notify(`👋 Bienvenue ${name} !`);
-    }
+    // Show professor speech on all screens
+    startProfSpeech();
+    if(L.isHost) showHostBadge();
   }
 }
 
@@ -816,16 +812,128 @@ function notify(msg){
 }
 
 // ═══════════════════════════════════════════════
+//  PROFESSOR GRAPH SPEECH
+// ═══════════════════════════════════════════════
+const PROF_LINES = [
+  `Bonjour, jeunes dresseurs et dresseuses ! Je suis le Dr. GRAPH, spécialiste des mélodies Pokémon !`,
+  `Aujourd'hui, nous célébrons 30 ans de musiques légendaires. Des routes de Jadielle aux sommets de Paldea !`,
+  `Saurez-vous reconnaître ces OSTs mythiques ? Chaque note est un indice... chaque seconde compte !`,
+  `Que l'aventure commence ! Bonne chance à tous — devenez les Maîtres des OST Pokémon !`,
+];
+
+let profState = {
+  lineIdx: 0,
+  charIdx: 0,
+  typing: false,
+  interval: null,
+  done: false,
+};
+
+function sfxDialogBip(){ beep(523+Math.random()*100,.04,'square',.04); }
+
+function startProfSpeech(){
+  profState = { lineIdx:0, charIdx:0, typing:false, interval:null, done:false };
+  showPage('prof');
+
+  // Build progress dots
+  const dots = document.getElementById('prof-dots');
+  dots.innerHTML = PROF_LINES.map((_,i)=>`<div class="prof-dot${i===0?' active':''}" id="pdot-${i}"></div>`).join('');
+
+  // Professor entry animation
+  const stage = document.getElementById('prof-stage');
+  stage.style.animation = 'none';
+  void stage.offsetWidth;
+  stage.style.animation = 'profEntry .6s cubic-bezier(.34,1.56,.64,1) both';
+
+  setTimeout(()=> typeNextLine(), 700);
+}
+
+function typeNextLine(){
+  const line = PROF_LINES[profState.lineIdx];
+  const textEl = document.getElementById('prof-text');
+  const cursor = document.getElementById('prof-cursor');
+  const hint   = document.getElementById('prof-hint');
+
+  textEl.textContent = '';
+  cursor.classList.remove('show');
+  hint.style.opacity = '0';
+  profState.charIdx = 0;
+  profState.typing  = true;
+
+  clearInterval(profState.interval);
+  profState.interval = setInterval(()=>{
+    if(profState.charIdx < line.length){
+      textEl.textContent += line[profState.charIdx];
+      profState.charIdx++;
+      if(profState.charIdx % 2 === 0) sfxDialogBip();
+    } else {
+      clearInterval(profState.interval);
+      profState.typing = false;
+      cursor.classList.add('show');
+      hint.style.opacity = '1';
+    }
+  }, 38);
+}
+
+function profAdvance(){
+  if(profState.done) return;
+
+  // If still typing → show full line immediately
+  if(profState.typing){
+    clearInterval(profState.interval);
+    profState.typing = false;
+    const line = PROF_LINES[profState.lineIdx];
+    document.getElementById('prof-text').textContent = line;
+    document.getElementById('prof-cursor').classList.add('show');
+    document.getElementById('prof-hint').style.opacity = '1';
+    beep(440,.05,'square',.06);
+    return;
+  }
+
+  // Update dots
+  const curDot = document.getElementById(`pdot-${profState.lineIdx}`);
+  if(curDot){ curDot.classList.remove('active'); curDot.classList.add('done'); }
+
+  profState.lineIdx++;
+
+  if(profState.lineIdx >= PROF_LINES.length){
+    // Speech done → go to lobby
+    profState.done = true;
+    beep(523,.08,'square',.1); beep(659,.08,'square',.1,0.1); beep(784,.2,'square',.12,0.2);
+    const stage = document.getElementById('prof-stage');
+    stage.style.transition = 'transform .5s ease-in, opacity .5s ease-in';
+    stage.style.transform = 'translateX(-50%) translateY(40px)';
+    stage.style.opacity   = '0';
+    setTimeout(()=>{
+      showPage('lobby');
+      if(L.isHost){ showHostBadge(); notify('✅ Connecté en tant qu\'animateur !'); }
+      else { notify(`🎓 Bonne chance, ${L.myName} !`); }
+    }, 600);
+  } else {
+    const nextDot = document.getElementById(`pdot-${profState.lineIdx}`);
+    if(nextDot){ nextDot.classList.add('active'); }
+    beep(330,.05,'square',.06);
+    typeNextLine();
+  }
+}
+
+// ═══════════════════════════════════════════════
 //  KEYBOARD
 // ═══════════════════════════════════════════════
 document.addEventListener('keydown', e=>{
-  if(e.key==='Enter'){
+  if(e.key==='Enter' || e.key===' '){
     if(L.phase==='connect') joinGame();
+    else if(L.phase==='prof') profAdvance();
   }
 });
 
+// Click anywhere on screen to advance professor dialog
+document.getElementById('screen').addEventListener('click', ()=>{
+  if(L.phase==='prof') profAdvance();
+});
+
 // Init
-window._fb = { startGame, hostReveal, hostNextTrack, hostSkip, hostResetGame, joinGame, toggleOstPanel, selectGender, kickPlayer, buildExtOstList };
+window._fb = { startGame, hostReveal, hostNextTrack, hostSkip, hostResetGame, joinGame, toggleOstPanel, selectGender, kickPlayer, buildExtOstList, profAdvance };
 </script>
 
 <style>
@@ -1059,6 +1167,109 @@ body::after{
 @keyframes currentBlink{0%,100%{opacity:1}50%{opacity:.6}}
 .legend-grid{display:flex;flex-direction:column;gap:3px;}
 .legend-row{font-size:4px;color:var(--gb3);line-height:1.8;display:flex;gap:4px;align-items:flex-start;}
+/* ── PROFESSOR PAGE ─────────────────────────────── */
+#pg-prof{
+  background:var(--gb0);
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  align-items:center;justify-content:flex-end;
+  overflow:hidden;
+}
+#pg-prof.active{ display:flex; }
+
+/* Animated background — subtle grid */
+.prof-bg{
+  position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(0deg,transparent 0,transparent 7px,rgba(139,188,15,.06) 7px,rgba(139,188,15,.06) 8px),
+    repeating-linear-gradient(90deg,transparent 0,transparent 7px,rgba(139,188,15,.06) 7px,rgba(139,188,15,.06) 8px);
+  animation:bgScroll 8s linear infinite;
+}
+@keyframes bgScroll{from{background-position:0 0,0 0}to{background-position:0 80px,80px 0}}
+
+/* Professor sprite container */
+.prof-stage{
+  position:absolute;
+  bottom:105px;
+  left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;
+  animation:profEntry .6s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes profEntry{from{transform:translateX(-50%) translateY(30px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+
+.prof-name-tag{
+  background:var(--gb0);
+  border:2px solid var(--gb4);
+  color:var(--gb5);
+  font-size:5px;
+  padding:2px 8px;
+  border-radius:1px;
+  margin-bottom:4px;
+  letter-spacing:1px;
+}
+
+/* Dialog box — classic RPG style */
+.prof-dialog{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  background:var(--gb7);
+  border-top:4px solid var(--gb0);
+  padding:10px 14px 12px;
+  min-height:100px;
+  z-index:10;
+}
+.prof-dialog-inner{
+  border:3px solid var(--gb0);
+  border-radius:2px;
+  padding:8px 10px;
+  background:var(--gb6);
+  min-height:70px;
+  position:relative;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+.prof-text{
+  font-size:6px;
+  color:var(--gb0);
+  line-height:2;
+  min-height:40px;
+  word-break:break-word;
+}
+.prof-cursor{
+  display:inline-block;
+  width:7px;height:7px;
+  border-right:3px solid var(--gb0);
+  border-bottom:3px solid var(--gb0);
+  transform:rotate(45deg) translateY(-2px);
+  margin-left:4px;
+  animation:cursorBlink .6s step-end infinite;
+  vertical-align:middle;
+  opacity:0;
+}
+.prof-cursor.show{ opacity:1; }
+@keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
+
+.prof-hint{
+  font-size:4px;
+  color:var(--gb2);
+  text-align:right;
+  margin-top:4px;
+  animation:hintBlink 1.2s ease-in-out infinite;
+}
+@keyframes hintBlink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Progress dots */
+.prof-dots{
+  display:flex;gap:4px;justify-content:center;
+  margin-top:5px;
+}
+.prof-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--gb2);transition:background .3s;
+}
+.prof-dot.done{ background:var(--gb0); }
+.prof-dot.active{ background:var(--gb4); animation:dotPulse .6s ease-in-out infinite alternate; }
+@keyframes dotPulse{from{transform:scale(1)}to{transform:scale(1.4)}}
+
 /* Firebase config warning */
 .config-warning{background:rgba(204,34,0,.15);border:2px solid var(--red);border-radius:3px;padding:10px 12px;font-size:5px;color:#ff8844;line-height:2;text-align:center;width:min(var(--screen-w),96vw);margin-bottom:10px;display:none;}
 .config-warning.show{display:block;}
@@ -1105,6 +1316,76 @@ body::after{
         <div class="connect-hint">
           Laisse le mot de passe vide si tu es joueur<br>
           Entre le code animateur pour gérer la partie
+        </div>
+      </div>
+
+      <!-- ── PROFESSEUR GRAPH ───────────────────────── -->
+      <div class="page" id="pg-prof">
+        <div class="prof-bg"></div>
+
+        <!-- Professor pixel-art sprite -->
+        <div class="prof-stage" id="prof-stage">
+          <div class="prof-name-tag">Dr. GRAPH</div>
+          <!-- Prof. Graph SVG — blouse blanche, lunettes, cheveux grisonnants -->
+          <svg width="90" height="130" viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg">
+            <!-- Blouse -->
+            <rect x="14" y="36" width="32" height="30" rx="2" fill="#e8f0c8"/>
+            <rect x="14" y="36" width="32" height="6" fill="#d4e8a0"/>
+            <!-- Col chemise & cravate -->
+            <rect x="26" y="36" width="8" height="20" fill="#b8d860"/>
+            <rect x="28" y="38" width="4" height="14" fill="#2d5a27"/>
+            <!-- Tête -->
+            <rect x="18" y="16" width="24" height="22" rx="4" fill="#d4a878"/>
+            <!-- Cheveux grisonnants -->
+            <rect x="16" y="12" width="28" height="10" rx="3" fill="#a8a898"/>
+            <rect x="14" y="16" width="6" height="8" rx="2" fill="#a8a898"/>
+            <rect x="40" y="16" width="6" height="8" rx="2" fill="#a8a898"/>
+            <rect x="18" y="10" width="24" height="6" rx="2" fill="#888878"/>
+            <!-- Lunettes -->
+            <rect x="18" y="24" width="9" height="7" rx="2" fill="none" stroke="#1a3320" stroke-width="1.5"/>
+            <rect x="33" y="24" width="9" height="7" rx="2" fill="none" stroke="#1a3320" stroke-width="1.5"/>
+            <rect x="27" y="26" width="6" height="2" fill="#1a3320"/>
+            <rect x="14" y="26" width="4" height="2" fill="#1a3320"/>
+            <rect x="42" y="26" width="4" height="2" fill="#1a3320"/>
+            <!-- Yeux derrière lunettes -->
+            <rect x="21" y="26" width="3" height="3" fill="#0a0f0a"/>
+            <rect x="36" y="26" width="3" height="3" fill="#0a0f0a"/>
+            <!-- Reflet lunettes -->
+            <rect x="19" y="25" width="2" height="2" fill="rgba(255,255,255,.5)"/>
+            <rect x="34" y="25" width="2" height="2" fill="rgba(255,255,255,.5)"/>
+            <!-- Moustache / sourcils -->
+            <rect x="19" y="22" width="8" height="2" rx="1" fill="#888878"/>
+            <rect x="33" y="22" width="8" height="2" rx="1" fill="#888878"/>
+            <!-- Sourire -->
+            <rect x="24" y="33" width="12" height="2" rx="1" fill="#a06040"/>
+            <rect x="25" y="34" width="2" height="2" fill="#e8c0a0"/>
+            <rect x="33" y="34" width="2" height="2" fill="#e8c0a0"/>
+            <!-- Bras gauche (levé, comme dans Pokémon) -->
+            <rect x="4" y="34" width="10" height="6" rx="3" fill="#e8f0c8" transform="rotate(-30 4 34)"/>
+            <rect x="2" y="28" width="8" height="8" rx="3" fill="#d4a878"/>
+            <!-- Bras droit -->
+            <rect x="46" y="36" width="10" height="6" rx="3" fill="#e8f0c8"/>
+            <rect x="54" y="36" width="6" height="8" rx="3" fill="#d4a878"/>
+            <!-- Jambes -->
+            <rect x="18" y="66" width="10" height="18" rx="2" fill="#2d5a27"/>
+            <rect x="32" y="66" width="10" height="18" rx="2" fill="#2d5a27"/>
+            <!-- Chaussures -->
+            <rect x="16" y="80" width="14" height="6" rx="2" fill="#0a0f0a"/>
+            <rect x="30" y="80" width="14" height="6" rx="2" fill="#0a0f0a"/>
+            <!-- Poche blouse -->
+            <rect x="16" y="46" width="8" height="10" rx="1" fill="#d4e8a0" stroke="#b8c878" stroke-width="1"/>
+            <rect x="17" y="47" width="3" height="8" fill="#2d5a27" opacity=".4"/>
+          </svg>
+        </div>
+
+        <!-- Dialog box -->
+        <div class="prof-dialog">
+          <div class="prof-dialog-inner">
+            <div class="prof-text" id="prof-text"></div>
+            <span class="prof-cursor" id="prof-cursor"></span>
+            <div class="prof-hint" id="prof-hint">▼ Appuyer sur A pour continuer</div>
+          </div>
+          <div class="prof-dots" id="prof-dots"></div>
         </div>
       </div>
 
@@ -1227,7 +1508,7 @@ body::after{
     </div>
     <div class="ab-wrap">
       <div class="btn-b">B</div>
-      <div class="btn-a" onclick="window._fb.joinGame()">A</div>
+      <div class="btn-a" onclick="if(L.phase==='prof') window._fb.profAdvance(); else window._fb.joinGame();">A</div>
     </div>
   </div>
 </div>
