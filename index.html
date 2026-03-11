@@ -1425,14 +1425,14 @@ body::after{
           <span style="font-size:5px;color:var(--gb1)">JOUEURS : <span id="lobby-count">0</span></span>
         </div>
         <div class="players-scroll" id="players-list"></div>
-        <button class="start-big host-only-block" onclick="window._fb.startGame()" style="display:none">▶ LANCER LE BLINDTEST</button>
+        <button class="start-big host-only-block" onclick="window._fb.startGame()">▶ LANCER LE BLINDTEST</button>
         <div id="start-locked" style="width:100%;padding:7px;background:var(--gb1);border-radius:2px;font-size:5px;color:var(--gb2);text-align:center;line-height:2;">
           ⏳ EN ATTENTE DU LANCEMENT<br>
           <span style="font-size:4px">L'animateur va démarrer la partie</span>
         </div>
         <!-- Host reset button -->
         <button class="host-only-block" id="btn-full-reset" onclick="confirmFullReset()"
-          style="display:none;width:100%;padding:5px;font-size:5px;background:rgba(204,34,0,.15);color:#ff6644;border:1px solid rgba(204,34,0,.4);font-family:'Press Start 2P',monospace;cursor:pointer;border-radius:2px;margin-top:2px;">
+          style="width:100%;padding:5px;font-size:5px;background:rgba(204,34,0,.15);color:#ff6644;border:1px solid rgba(204,34,0,.4);font-family:'Press Start 2P',monospace;cursor:pointer;border-radius:2px;margin-top:2px;">
           🗑️ RESET COMPLET (efface tout)
         </button>
         <div class="lobby-hint">
@@ -1524,7 +1524,7 @@ body::after{
         <div class="final-title">🏆 FIN DU BLINDTEST !<br>30 ANS DE POKÉMON</div>
         <div class="podium" id="podium"></div>
         <div class="full-sb" id="full-sb"></div>
-        <button class="start-big host-only-block" onclick="window._fb.hostResetGame()" style="font-size:5px;margin-top:4px;display:none;">↺ REJOUER</button>
+        <button class="start-big host-only-block" onclick="window._fb.hostResetGame()" style="font-size:5px;margin-top:4px;">↺ REJOUER</button>
       </div>
 
     </div><!-- /screen -->
