@@ -676,12 +676,31 @@ function showFinalPage(){
 
 async function hostResetGame(){
   if(!L.isHost) return;
-  // Reset all scores to 0
+  // Reset scores to 0 but keep players
   const updates={};
   Object.keys(L.scores).forEach(name=>{ updates[`scores/${name}/pts`]=0; });
   await update(roomRef(), updates);
   await fbSet('answers', null);
   await fbUpdate('state',{phase:'lobby'});
+}
+
+async function hostFullReset(){
+  if(!L.isHost) return;
+  // Wipe EVERYTHING — players, scores, answers, state
+  await remove(roomRef());
+  // Reset local state
+  L.players = {};
+  L.scores  = {};
+  L.answers = {};
+  L.gameState = null;
+  beep(220,.15,'sawtooth',.1);
+  beep(180,.2,'sawtooth',.1,.18);
+  notify('🗑️ Partie réinitialisée !');
+  // Go back to connect screen for everyone
+  // (listeners will fire with null → stays on current page, so we force it)
+  showPage('connect');
+  // Re-register host as player
+  L.myName = null;
 }
 
 // ═══════════════════════════════════════════════
@@ -933,7 +952,7 @@ document.getElementById('screen').addEventListener('click', ()=>{
 });
 
 // Init
-window._fb = { startGame, hostReveal, hostNextTrack, hostSkip, hostResetGame, joinGame, toggleOstPanel, selectGender, kickPlayer, buildExtOstList, profAdvance };
+window._fb = { startGame, hostReveal, hostNextTrack, hostSkip, hostResetGame, hostFullReset, joinGame, toggleOstPanel, selectGender, kickPlayer, buildExtOstList, profAdvance };
 </script>
 
 <style>
@@ -1273,6 +1292,16 @@ body::after{
 /* Firebase config warning */
 .config-warning{background:rgba(204,34,0,.15);border:2px solid var(--red);border-radius:3px;padding:10px 12px;font-size:5px;color:#ff8844;line-height:2;text-align:center;width:min(var(--screen-w),96vw);margin-bottom:10px;display:none;}
 .config-warning.show{display:block;}
+/* Reset confirm dialog */
+.reset-dialog{position:fixed;inset:0;background:rgba(0,5,0,.92);z-index:6000;display:none;align-items:center;justify-content:center;}
+.reset-dialog.show{display:flex;}
+.reset-card{background:var(--gb0);border:3px solid var(--red);border-radius:4px;padding:18px 22px;text-align:center;width:min(320px,90vw);animation:lockCardIn .25s ease-out;}
+@keyframes lockCardIn{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+.reset-title{font-size:8px;color:#ff6644;line-height:1.8;margin-bottom:6px;}
+.reset-sub{font-size:5px;color:var(--gb3);line-height:2;margin-bottom:14px;}
+.reset-btns{display:flex;gap:8px;justify-content:center;}
+.r-btn{background:var(--red);color:#fff;border:2px solid #ff4422;font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;border-radius:2px;}
+.r-btn-cancel{background:var(--gb1);color:var(--gb4);border:2px solid var(--gb2);font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;border-radius:2px;}
 </style>
 </head>
 <body>
@@ -1401,6 +1430,11 @@ body::after{
           ⏳ EN ATTENTE DU LANCEMENT<br>
           <span style="font-size:4px">L'animateur va démarrer la partie</span>
         </div>
+        <!-- Host reset button -->
+        <button class="host-only-block" id="btn-full-reset" onclick="confirmFullReset()"
+          style="display:none;width:100%;padding:5px;font-size:5px;background:rgba(204,34,0,.15);color:#ff6644;border:1px solid rgba(204,34,0,.4);font-family:'Press Start 2P',monospace;cursor:pointer;border-radius:2px;margin-top:2px;">
+          🗑️ RESET COMPLET (efface tout)
+        </button>
         <div class="lobby-hint">
           🎵 Partage d'écran Discord pour la musique<br>
           🎲 Évènements spéciaux aléatoires · ⏱ 30 sec/OST
@@ -1548,11 +1582,43 @@ body::after{
 
 <div class="notif" id="notif"></div>
 
+<!-- Reset confirm dialog -->
+<div class="reset-dialog" id="reset-dialog">
+  <div class="reset-card">
+    <div class="reset-title">⚠️ RESET COMPLET ?</div>
+    <div class="reset-sub">
+      Ceci va effacer :<br>
+      tous les joueurs · tous les scores · toute la partie<br><br>
+      <span style="color:var(--red)">Cette action est irréversible !</span>
+    </div>
+    <div class="reset-btns">
+      <button class="r-btn" onclick="doFullReset()">🗑️ CONFIRMER</button>
+      <button class="r-btn-cancel" onclick="document.getElementById('reset-dialog').classList.remove('show')">ANNULER</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  function confirmFullReset(){
+    document.getElementById('reset-dialog').classList.add('show');
+  }
+  async function doFullReset(){
+    document.getElementById('reset-dialog').classList.remove('show');
+    await window._fb.hostFullReset();
+  }
+  window.confirmFullReset = confirmFullReset;
+  window.doFullReset = doFullReset;
+</script>
+
 <!-- Check Firebase config -->
 <script type="module">
   setTimeout(()=>{
-    if(document.querySelector('script[type="module"]').textContent.includes('REMPLACE_PAR_TA_CLE')){
-      document.getElementById('config-warn').classList.add('show');
+    const scripts = document.querySelectorAll('script[type="module"]');
+    for(const s of scripts){
+      if(s.textContent.includes('REMPLACE_PAR_TA_CLE')){
+        document.getElementById('config-warn').classList.add('show');
+        break;
+      }
     }
   },500);
 </script>
